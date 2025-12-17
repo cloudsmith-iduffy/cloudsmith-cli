@@ -115,9 +115,7 @@ repositories {
 
 ### ✅ Helm
 
-**Support**: Yes - Uses Docker credential helpers
-
-**Helm 3+ (OCI Registries)**:
+**Support**: Yes - Uses Docker credential helpers (Helm 3+ with OCI registries)
 
 Helm 3+ stores charts in OCI registries and uses Docker's credential helper mechanism.
 
@@ -132,24 +130,7 @@ helm registry login docker.cloudsmith.io
 helm push my-chart.tgz oci://docker.cloudsmith.io/my-org/my-repo
 ```
 
-**Helm 2 (Classic/HTTP Repositories)**:
-
-Helm 2 uses traditional HTTP-based chart repositories. Use basic auth with dynamically fetched tokens:
-
-```bash
-# Fetch token
-TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-
-# Add repository with authentication
-helm repo add cloudsmith https://charts.cloudsmith.io/my-org/my-repo/ \
-  --username token \
-  --password "$TOKEN"
-
-# Install chart
-helm install my-release cloudsmith/my-chart
-```
-
-**Note**: Helm 2 tokens will expire (default 12 hours). You'll need to update the repository credentials periodically or use a wrapper script.
+**Note**: Helm 2 (classic HTTP repositories) is not supported as it requires manual token refresh every 12 hours.
 
 ---
 
@@ -395,43 +376,6 @@ The `terraform-credentials-cloudsmith` helper automatically provides credentials
 
 ---
 
-### ✅ Swift Package Manager
-
-**Support**: Yes - .netrc file
-
-Swift Package Manager uses `.netrc` for authentication.
-
-**Recommended Approach** (see `examples/swift/`):
-
-```bash
-TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-echo "machine swift.cloudsmith.io login token password $TOKEN" > ~/.netrc
-chmod 600 ~/.netrc
-```
-
-**Note**: Tokens expire after ~12 hours; use the wrapper script for automatic refresh.
-
----
-
-### ✅ Go Modules
-
-**Support**: Yes - .netrc file
-
-Go modules use `.netrc` for authentication with private proxies.
-
-**Recommended Approach** (see `examples/go/`):
-
-```bash
-TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-echo "machine go.cloudsmith.io login token password $TOKEN" > ~/.netrc
-chmod 600 ~/.netrc
-export GOPRIVATE="go.cloudsmith.io/my-org/*"
-```
-
-**Note**: Tokens expire after ~12 hours; use the wrapper script for automatic refresh.
-
----
-
 ### ✅ CRAN (R)
 
 **Support**: Yes - renv with custom headers
@@ -493,23 +437,22 @@ The following package managers have been removed from this guide because they do
 | **Maven** | Wrapper script | ✅ Yes | `mvn-with-cloudsmith.sh` |
 | **Gradle** | Exec in build.gradle | ✅ Yes | `getCloudsmithToken()` |
 | **Helm 3** | Docker credentials | ✅ Yes | Uses Docker helper |
-| **Helm 2** | Wrapper script | ⚠️ Manual | Manual repo add with token |
 | **Conan** | Hooks | ✅ Yes | `cloudsmith_auth.py` hook |
 | **Composer** | Wrapper script | ✅ Yes | `composer-with-cloudsmith.sh` |
 | **Cargo** | Credential provider | ✅ Yes | `cargo-credential-cloudsmith` |
 | **sbt** | Credential resolver | ✅ Yes | Dynamic in `credentials.sbt` |
 | **Terraform** | Credential helper | ✅ Yes | `terraform-credentials-cloudsmith` |
-| **Swift** | .netrc script | ⚠️ Manual | `setup-swift-auth.sh` |
-| **Go** | .netrc script | ⚠️ Manual | `setup-go-auth.sh` |
 | **R/CRAN** | renv headers | ✅ Yes | `cloudsmith-auth.R` |
 | **Conda** | ❌ Not supported | No | No dynamic mechanism |
 | **Hex** | ❌ Not supported | No | No dynamic mechanism |
 | **Bundler** | ❌ Not supported | No | No dynamic mechanism |
 | **CocoaPods** | ❌ Not supported | No | No credential helper support |
+| **Go** | ❌ Not supported | No | Only .netrc (manual refresh) |
+| **Swift** | ❌ Not supported | No | Only .netrc (manual refresh) |
+| **Helm 2** | ❌ Not supported | No | Manual refresh required |
 
 ✅ = Full support with automatic token refresh  
-⚠️ = Requires manual refresh (tokens expire after 12 hours)  
-❌ = Not supported due to lack of dynamic credential mechanisms
+❌ = Not supported due to lack of dynamic credential mechanisms or manual refresh requirement
 
 ## Contributing
 

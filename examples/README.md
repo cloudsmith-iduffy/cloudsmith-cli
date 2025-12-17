@@ -38,15 +38,7 @@ This directory contains example implementations of credential helpers for variou
 - **Status**: ✅ Full implementation
 - **Description**: Credential provider for Cargo (Rust 1.68+)
 
-#### Go Modules
-- **Path**: `go/`
-- **Status**: ✅ Full implementation
-- **Description**: .netrc-based authentication for Go module proxies
 
-#### Swift Package Manager
-- **Path**: `swift/`
-- **Status**: ✅ Full implementation
-- **Description**: .netrc and swift package-registry login integration
 
 #### CRAN (R)
 - **Path**: `cran/`
@@ -95,8 +87,6 @@ This directory contains example implementations of credential helpers for variou
 | NuGet | Credential provider plugin | ✅ Yes | Medium |
 | Dart | dart pub token | ✅ Yes | Low |
 | Cargo | Credential provider | ✅ Yes | Low |
-| Go | .netrc | ⚠️ Manual refresh | Low |
-| Swift | .netrc | ⚠️ Manual refresh | Low |
 | R/CRAN | renv headers | ✅ Yes | Medium |
 | Maven | Wrapper script | ✅ Yes | Low |
 | Gradle | Exec in build script | ✅ Yes | Low |
@@ -104,7 +94,7 @@ This directory contains example implementations of credential helpers for variou
 | Conan | Hooks | ✅ Yes | Medium |
 | Composer | Wrapper script | ✅ Yes | Low |
 | Terraform | Credential helper | ✅ Yes | Low |
-| Helm | Docker credentials | ✅ Yes | Low |
+| Helm (OCI) | Docker credentials | ✅ Yes | Low |
 
 ## Removed Package Managers
 
@@ -113,6 +103,9 @@ The following package managers were removed due to lack of dynamic credential su
 - **Conda**: No credential helper support, only static .netrc
 - **Hex (Elixir)**: Only environment variables, no dynamic mechanism
 - **Bundler (Ruby)**: No dynamic credential provider support
+- **CocoaPods**: No external credential helper support
+- **Go Modules**: Only .netrc support, requires manual token refresh every 12 hours
+- **Swift Package Manager**: Only .netrc support, requires manual token refresh every 12 hours
 
 See `OTHER_PACKAGE_MANAGERS.md` for details on supported and unsupported package managers.
 
