@@ -246,15 +246,15 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
 @click.pass_context
 def get(ctx, opts):
     """Get the current authentication token for the active session.
-    
+
     This command intelligently detects and returns the appropriate authentication
     token based on the current environment:
-    
+
     - If using an API key (from config or environment), returns the API key
     - If authenticated via SAML, returns the SAML JWT access token
     - If running in a CI/CD environment (GitHub Actions, GitLab CI, CircleCI,
       AWS, Azure), exchanges the provider's OIDC token for a Cloudsmith token
-    
+
     This is useful for credential helpers, scripts, and other tools that need
     to authenticate with Cloudsmith programmatically.
     """
@@ -262,13 +262,13 @@ def get(ctx, opts):
     if opts.api_key:
         click.echo(opts.api_key)
         return
-    
+
     # Check if we have a SAML access token in the keyring
     access_token = keyring.get_access_token(opts.api_host)
     if access_token:
         click.echo(access_token)
         return
-    
+
     # Try to get OIDC token from CI/CD environment
     provider, _ = detect_ci_environment()
     if provider:
@@ -277,10 +277,7 @@ def get(ctx, opts):
             try:
                 session = create_configured_session(opts)
                 cloudsmith_token = exchange_oidc_token(
-                    opts.api_host,
-                    oidc_token,
-                    provider,
-                    session=session
+                    opts.api_host, oidc_token, provider, session=session
                 )
                 if cloudsmith_token:
                     click.echo(cloudsmith_token)
@@ -289,12 +286,12 @@ def get(ctx, opts):
                 if opts.debug:
                     click.echo(f"Debug: OIDC token exchange failed: {exc}", err=True)
                 # Fall through to error message
-    
+
     # No token found
     click.secho(
         "No authentication token found. Please authenticate using one of these methods:",
         fg="red",
-        err=True
+        err=True,
     )
     click.echo("  1. Set CLOUDSMITH_API_KEY environment variable", err=True)
     click.echo("  2. Run 'cloudsmith login' to get an API key", err=True)

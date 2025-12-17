@@ -3,8 +3,6 @@
 import os
 from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
-
 from cloudsmith_cli.cli.oidc import (
     detect_ci_environment,
     exchange_oidc_token,
@@ -38,16 +36,16 @@ class TestDetectCIEnvironment:
 
     def test_detect_aws_codebuild(self):
         """Test detection of AWS CodeBuild environment."""
-        with patch.dict(os.environ, {"CODEBUILD_BUILD_ID": "some-build-id"}, clear=True):
+        with patch.dict(
+            os.environ, {"CODEBUILD_BUILD_ID": "some-build-id"}, clear=True
+        ):
             provider, token_var = detect_ci_environment()
             assert provider == "aws"
             assert token_var == "AWS_WEB_IDENTITY_TOKEN_FILE"
 
     def test_detect_azure_pipelines(self):
         """Test detection of Azure Pipelines environment."""
-        with patch.dict(
-            os.environ, {"AZURE_PIPELINES": "true"}, clear=True
-        ):
+        with patch.dict(os.environ, {"AZURE_PIPELINES": "true"}, clear=True):
             provider, token_var = detect_ci_environment()
             assert provider == "azure"
             assert token_var == "SYSTEM_OIDCTOKEN"
