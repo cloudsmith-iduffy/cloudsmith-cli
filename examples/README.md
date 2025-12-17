@@ -31,35 +31,30 @@ This directory contains example implementations of credential helpers for variou
 - **Status**: ✅ Full implementation
 - **Description**: Hook-based authentication for Conan package manager
 
-### Conda
-- **Path**: `conda/`
-- **Status**: ✅ Full implementation
-- **Description**: .netrc-based authentication setup for Conda
-
 ### Composer (PHP)
 - **Path**: `composer/`
 - **Status**: ✅ Full implementation
-- **Description**: Authentication configuration for Composer
-
-### Bundler (Ruby)
-- **Path**: `ruby/`
-- **Status**: ✅ Full implementation
-- **Description**: Credential helper for Bundler and RubyGems
+- **Description**: Wrapper script for authentication with Composer
 
 ### Cargo (Rust)
 - **Path**: `cargo/`
 - **Status**: ✅ Full implementation
 - **Description**: Credential provider for Cargo (Rust 1.68+)
 
-### Hex (Elixir)
-- **Path**: `hex/`
-- **Status**: ✅ Full implementation
-- **Description**: Token-based authentication for Hex
-
 ### sbt (Scala)
 - **Path**: `sbt/`
 - **Status**: ✅ Full implementation
 - **Description**: Credential resolver for sbt builds
+
+## Removed Package Managers
+
+The following package managers were removed due to lack of dynamic credential support and 12-hour token expiry issues:
+
+- **Conda**: No credential helper support, only static .netrc
+- **Hex (Elixir)**: Only environment variables, no dynamic mechanism
+- **Bundler (Ruby)**: No dynamic credential provider support
+
+See `OTHER_PACKAGE_MANAGERS.md` for details on supported and unsupported package managers.
 
 ## Credential Helper Support by Package Manager
 
@@ -67,19 +62,19 @@ This directory contains example implementations of credential helpers for variou
 |----------------|---------------|----------------|--------------|
 | **Docker** | ✅ Native | Credential helpers | `docker-credential-cloudsmith/` |
 | **Python/pip/uv** | ✅ Native | Keyring backend | `python-keyring/` |
-| **Maven** | ✅ Native | Settings.xml + env vars | `maven/` |
+| **Maven** | ✅ Native | Wrapper script | `maven/` |
 | **Gradle** | ✅ Native | Credentials API | `gradle/` |
 | **Helm** | ✅ Native | Uses Docker creds (OCI) | Uses `docker-credential-cloudsmith/` |
 | **Conan** | ✅ Native | Hooks system | `conan/` |
-| **Composer** | ✅ Native | Auth config | `composer/` |
-| **Bundler** | ✅ Native | Bundle config | `ruby/` |
+| **Composer** | ✅ Native | Wrapper script | `composer/` |
 | **Cargo** | ✅ Native | Credential providers | `cargo/` |
 | **sbt** | ✅ Native | Credential resolvers | `sbt/` |
-| **Conda** | ⚠️  Limited | .netrc file | `conda/` |
-| **Hex** | ⚠️  Limited | Env vars only | `hex/` |
+| **Conda** | ❌ Removed | No dynamic support | - |
+| **Hex** | ❌ Removed | No dynamic support | - |
+| **Bundler** | ❌ Removed | No dynamic support | - |
 
 ✅ = Full external credential helper support  
-⚠️ = Environment variables or limited support
+❌ = Not supported due to token expiry issues
 
 ## General Usage Pattern
 

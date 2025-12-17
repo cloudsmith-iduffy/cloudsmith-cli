@@ -1,6 +1,6 @@
 # Credential Helper Support for Other Package Managers
 
-This document provides information about credential helper support for various package managers and how they could integrate with `cloudsmith tokens get`.
+This document provides information about credential helper support for various package managers and how they integrate with `cloudsmith tokens get`.
 
 ## Supported Package Managers
 
@@ -8,10 +8,18 @@ This document provides information about credential helper support for various p
 
 **Support**: Yes - via settings.xml with credential helper
 
-Maven supports external credential helpers through the `maven-settings` extension.
+Maven supports external credential helpers through wrapper scripts that dynamically fetch tokens.
 
-**Example Configuration** (`~/.m2/settings.xml`):
+**Recommended Approach** - Wrapper Script:
 
+Create `mvn-with-cloudsmith.sh`:
+```bash
+#!/bin/bash
+export CLOUDSMITH_TOKEN=$(cloudsmith tokens get ${CLOUDSMITH_OIDC_SLUG:+--oidc-slug $CLOUDSMITH_OIDC_SLUG})
+mvn "$@"
+```
+
+**~/.m2/settings.xml**:
 ```xml
 <settings>
   <servers>
@@ -24,16 +32,12 @@ Maven supports external credential helpers through the `maven-settings` extensio
 </settings>
 ```
 
-**Integration**:
+**Usage**:
 ```bash
-# Set token from cloudsmith CLI
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-
-# Maven will use the token from environment
-mvn deploy
+chmod +x mvn-with-cloudsmith.sh
+export CLOUDSMITH_OIDC_SLUG=my-org
+./mvn-with-cloudsmith.sh deploy
 ```
-
-**Alternative**: Use maven-password-encryption with a script that calls `cloudsmith tokens get`.
 
 ---
 
@@ -41,48 +45,70 @@ mvn deploy
 
 **Support**: Yes - Credentials API
 
-Gradle supports dynamic credentials through the Credentials API and can execute external commands.
+Gradle supports dynamic credentials through the Credentials API and can execute external commands directly in the build script.
 
-**Example Configuration** (`build.gradle`):
+**Configuration** (`build.gradle.kts`):
 
-```groovy
+```kotlin
+import java.io.ByteArrayOutputStream
+
+fun getCloudsmithToken(): String {
+    val oidcSlug = System.getenv("CLOUDSMITH_OIDC_SLUG")
+    val cmd = mutableListOf("cloudsmith", "tokens", "get")
+    
+    if (oidcSlug != null && oidcSlug.isNotEmpty()) {
+        cmd.addAll(listOf("--oidc-slug", oidcSlug))
+    }
+    
+    val stdout = ByteArrayOutputStream()
+    exec {
+        commandLine = cmd
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+
 repositories {
     maven {
-        url "https://maven.cloudsmith.io/my-org/my-repo/"
+        name = "Cloudsmith"
+        url = uri("https://maven.cloudsmith.io/my-org/my-repo/")
         credentials {
             username = "token"
             password = getCloudsmithToken()
         }
     }
 }
+```
 
+Or for Groovy (`build.gradle`):
+
+```groovy
 def getCloudsmithToken() {
     def oidcSlug = System.getenv("CLOUDSMITH_OIDC_SLUG")
     def cmd = ["cloudsmith", "tokens", "get"]
+    
     if (oidcSlug) {
         cmd += ["--oidc-slug", oidcSlug]
     }
-    return cmd.execute().text.trim()
+    
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine cmd
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
 }
-```
 
-Or using Gradle properties with environment variables:
-
-```groovy
 repositories {
     maven {
-        url "https://maven.cloudsmith.io/my-org/my-repo/"
+        name = "Cloudsmith"
+        url = "https://maven.cloudsmith.io/my-org/my-repo/"
         credentials {
             username = "token"
-            password = System.getenv("CLOUDSMITH_TOKEN")
+            password = getCloudsmithToken()
         }
     }
 }
-```
-
-```bash
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-gradle publish
 ```
 
 ---
@@ -91,9 +117,9 @@ gradle publish
 
 **Support**: Yes - Uses Docker credential helpers
 
-Helm 3+ stores charts in OCI registries and uses Docker's credential helper mechanism.
+**Helm 3+ (OCI Registries)**:
 
-**Configuration**:
+Helm 3+ stores charts in OCI registries and uses Docker's credential helper mechanism.
 
 Since Helm uses Docker's authentication, configure the Docker credential helper (see `docker-credential-cloudsmith/`):
 
@@ -106,6 +132,25 @@ helm registry login docker.cloudsmith.io
 helm push my-chart.tgz oci://docker.cloudsmith.io/my-org/my-repo
 ```
 
+**Helm 2 (Classic/HTTP Repositories)**:
+
+Helm 2 uses traditional HTTP-based chart repositories. Use basic auth with dynamically fetched tokens:
+
+```bash
+# Fetch token
+TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
+
+# Add repository with authentication
+helm repo add cloudsmith https://charts.cloudsmith.io/my-org/my-repo/ \
+  --username token \
+  --password "$TOKEN"
+
+# Install chart
+helm install my-release cloudsmith/my-chart
+```
+
+**Note**: Helm 2 tokens will expire (default 12 hours). You'll need to update the repository credentials periodically or use a wrapper script.
+
 ---
 
 ### ✅ Conan
@@ -114,18 +159,11 @@ helm push my-chart.tgz oci://docker.cloudsmith.io/my-org/my-repo
 
 Conan supports hooks that can be triggered on various events, including authentication.
 
-**Example Hook** (`~/.conan/hooks/cloudsmith_auth.py`):
+**Hook Implementation** (`~/.conan/hooks/cloudsmith_auth.py`):
 
 ```python
 import os
 import subprocess
-
-def pre_download(output, reference, remote_name, **kwargs):
-    """Hook called before downloading packages."""
-    if "cloudsmith.io" in remote_name or "cloudsmith.io" in str(kwargs.get('url', '')):
-        output.info("Getting Cloudsmith token...")
-        token = get_cloudsmith_token()
-        os.environ['CLOUDSMITH_TOKEN'] = token
 
 def get_cloudsmith_token():
     """Get token from cloudsmith CLI."""
@@ -136,68 +174,44 @@ def get_cloudsmith_token():
     
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return result.stdout.strip()
+
+def pre_download(output, reference, remote_name, **kwargs):
+    """Hook called before downloading packages."""
+    if "cloudsmith.io" in remote_name or "cloudsmith.io" in str(kwargs.get('url', '')):
+        output.info("Getting Cloudsmith token...")
+        token = get_cloudsmith_token()
+        # Note: This sets CONAN_LOGIN_USERNAME and CONAN_PASSWORD for Conan to use
+        # These are environment variables that Conan reads, not specific to cloudsmith CLI
+        os.environ['CONAN_LOGIN_USERNAME'] = 'token'
+        os.environ['CONAN_PASSWORD'] = token
 ```
 
-**Conan Configuration** (`~/.conan/remotes.json`):
-
-```json
-{
-  "remotes": [
-    {
-      "name": "cloudsmith",
-      "url": "https://conan.cloudsmith.io/my-org/my-repo",
-      "verify_ssl": true
-    }
-  ]
-}
-```
-
-```bash
-# Authenticate (hook will get token automatically)
-conan remote login cloudsmith token -p $(cloudsmith tokens get --oidc-slug my-org)
-```
-
----
-
-### ⚠️ Conda
-
-**Support**: Limited - Environment variables in .condarc
-
-Conda supports environment variable substitution in `.condarc` but doesn't have a full credential helper system.
-
-**Configuration** (`~/.condarc`):
-
-```yaml
-channels:
-  - https://conda.cloudsmith.io/my-org/my-repo
-
-# Note: Conda doesn't support credential helpers directly
-# Use environment variables or .netrc file
-```
-
-**Workaround using .netrc**:
-
-```bash
-# Generate .netrc entry
-echo "machine conda.cloudsmith.io" >> ~/.netrc
-echo "  login token" >> ~/.netrc
-echo "  password $(cloudsmith tokens get --oidc-slug my-org)" >> ~/.netrc
-chmod 600 ~/.netrc
-
-# Conda will use .netrc for authentication
-conda install -c https://conda.cloudsmith.io/my-org/my-repo my-package
-```
+**Note**: The `CONAN_LOGIN_USERNAME` and `CONAN_PASSWORD` environment variables are read by Conan itself during authentication, not by the cloudsmith CLI. This is Conan's standard mechanism for providing credentials.
 
 ---
 
 ### ✅ Composer (PHP)
 
-**Support**: Yes - Auth plugins
+**Support**: Yes - Can execute commands via wrapper scripts
 
-Composer supports authentication plugins and can execute commands to retrieve credentials.
+**Recommended Approach** - Wrapper Script:
 
-**Example using environment variables** (`composer.json`):
+Create `composer-with-cloudsmith.sh`:
+```bash
+#!/bin/bash
+TOKEN=$(cloudsmith tokens get ${CLOUDSMITH_OIDC_SLUG:+--oidc-slug $CLOUDSMITH_OIDC_SLUG})
+composer config http-basic.composer.cloudsmith.io token "$TOKEN"
+composer "$@"
+```
 
+**Usage**:
+```bash
+chmod +x composer-with-cloudsmith.sh
+export CLOUDSMITH_OIDC_SLUG=my-org
+./composer-with-cloudsmith.sh install
+```
+
+**composer.json**:
 ```json
 {
   "repositories": [
@@ -209,56 +223,6 @@ Composer supports authentication plugins and can execute commands to retrieve cr
 }
 ```
 
-**Authentication**:
-
-```bash
-# Set token
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-
-# Configure composer
-composer config http-basic.composer.cloudsmith.io token "$CLOUDSMITH_TOKEN"
-
-# Or use global auth.json
-```
-
-**Alternative**: Create a Composer plugin that calls `cloudsmith tokens get`.
-
----
-
-### ✅ Bundler (Ruby)
-
-**Support**: Yes - Credentials from environment or bundle config
-
-Bundler can use credentials from environment variables or bundle configuration.
-
-**Configuration** (`Gemfile`):
-
-```ruby
-source "https://gems.cloudsmith.io/my-org/my-repo/" do
-  gem "my-gem"
-end
-```
-
-**Authentication**:
-
-```bash
-# Option 1: Bundle config
-bundle config set --global https://gems.cloudsmith.io/my-org/my-repo/ token:$(cloudsmith tokens get --oidc-slug my-org)
-
-# Option 2: Environment variable
-export BUNDLE_GEMS__CLOUDSMITH__IO="token:$(cloudsmith tokens get --oidc-slug my-org)"
-
-bundle install
-```
-
-**Gemfile with credentials**:
-
-```ruby
-source "https://token:#{ENV['CLOUDSMITH_TOKEN']}@gems.cloudsmith.io/my-org/my-repo/" do
-  gem "my-gem"
-end
-```
-
 ---
 
 ### ✅ Cargo (Rust)
@@ -267,18 +231,7 @@ end
 
 Cargo supports credential providers for registry authentication.
 
-**Configuration** (`~/.cargo/config.toml`):
-
-```toml
-[registries.cloudsmith]
-index = "sparse+https://cargo.cloudsmith.io/my-org/my-repo/"
-credential-provider = "cloudsmith-credential-provider"
-
-[registry]
-default = "cloudsmith"
-```
-
-**Credential Provider Script** (`cloudsmith-credential-provider`):
+**Credential Provider Script** (`cargo-credential-cloudsmith`):
 
 ```bash
 #!/bin/bash
@@ -286,56 +239,37 @@ default = "cloudsmith"
 
 case "$1" in
   get)
-    # Get the registry URL from stdin
-    read -r registry_url
-    
-    # Get token from cloudsmith CLI
     if [ -n "$CLOUDSMITH_OIDC_SLUG" ]; then
-      token=$(cloudsmith tokens get --oidc-slug "$CLOUDSMITH_OIDC_SLUG")
+      TOKEN=$(cloudsmith tokens get --oidc-slug "$CLOUDSMITH_OIDC_SLUG")
     else
-      token=$(cloudsmith tokens get)
+      TOKEN=$(cloudsmith tokens get)
     fi
     
-    # Return in Cargo format
-    echo "{\"Ok\":{\"kind\":\"token\",\"token\":\"$token\"}}"
+    if [ -z "$TOKEN" ]; then
+      echo '{"Err":{"kind":"other","message":"Failed to get Cloudsmith token"}}'
+      exit 1
+    fi
+    
+    echo "{\"Ok\":{\"kind\":\"token\",\"token\":\"$TOKEN\",\"cache\":\"session\"}}"
     ;;
   *)
-    echo "{\"Err\":{\"kind\":\"unsupported\"}}"
+    echo '{"Err":{"kind":"unsupported-command"}}'
     exit 1
     ;;
 esac
 ```
 
-Make executable and place in PATH:
-```bash
-chmod +x cloudsmith-credential-provider
-sudo mv cloudsmith-credential-provider /usr/local/bin/
+**Configuration** (`~/.cargo/config.toml`):
+```toml
+[registries.cloudsmith]
+index = "sparse+https://cargo.cloudsmith.io/my-org/my-repo/"
+credential-provider = "cloudsmith"
 ```
 
----
-
-### ⚠️ Hex (Elixir)
-
-**Support**: Limited - Environment variables
-
-Hex doesn't have a credential helper system but supports environment variables.
-
-**Configuration**:
-
+Install the provider:
 ```bash
-# Set token
-export HEX_API_KEY=$(cloudsmith tokens get --oidc-slug my-org)
-
-# Hex will use the environment variable
-mix hex.user auth
-```
-
-**Alternative using Mix config** (`config/config.exs`):
-
-```elixir
-config :hex,
-  api_url: "https://hex.cloudsmith.io/my-org/my-repo/",
-  api_key: System.get_env("HEX_API_KEY")
+chmod +x cargo-credential-cloudsmith
+sudo cp cargo-credential-cloudsmith /usr/local/bin/
 ```
 
 ---
@@ -350,57 +284,78 @@ sbt supports credential resolvers that can execute external commands.
 
 ```scala
 import scala.sys.process._
+import scala.util.Try
 
-credentials += {
-  val token = Seq("cloudsmith", "tokens", "get", 
-    sys.env.get("CLOUDSMITH_OIDC_SLUG").map(s => Seq("--oidc-slug", s)).getOrElse(Seq.empty): _*
-  ).!!.trim
+lazy val getCloudsmithToken: String = {
+  val oidcSlug = sys.env.get("CLOUDSMITH_OIDC_SLUG")
+  val cmd = oidcSlug match {
+    case Some(slug) => Seq("cloudsmith", "tokens", "get", "--oidc-slug", slug)
+    case None => Seq("cloudsmith", "tokens", "get")
+  }
   
-  Credentials(
-    "Cloudsmith",
-    "maven.cloudsmith.io",
-    "token",
-    token
-  )
+  Try(cmd.!!.trim).getOrElse {
+    sys.error("Failed to get Cloudsmith token")
+  }
 }
+
+credentials += Credentials(
+  "Cloudsmith",
+  "maven.cloudsmith.io",
+  "token",
+  getCloudsmithToken
+)
 ```
 
-**Or using a credential provider file**:
-
-```scala
-// In build.sbt or project/plugins.sbt
-credentials += {
-  val token = scala.sys.process.Process("cloudsmith tokens get").!!.trim
-  Credentials("Cloudsmith", "maven.cloudsmith.io", "token", token)
-}
+**Usage**:
+```bash
+export CLOUDSMITH_OIDC_SLUG=my-org
+sbt publish
 ```
+
+This approach dynamically fetches tokens on each sbt invocation, so tokens never become stale.
+
+---
+
+## Removed/Unsupported Package Managers
+
+The following package managers have been removed from this guide because they don't provide adequate mechanisms for dynamic credential retrieval and tokens expire after 12 hours:
+
+### ❌ Conda
+- No credential helper support
+- Only supports static credentials in `.netrc` or environment variables
+- Tokens would need to be manually refreshed every 12 hours
+
+### ❌ Hex (Elixir)
+- No credential helper support
+- Only supports environment variables for `HEX_API_KEY`
+- Would require manual token refresh every 12 hours
+
+### ❌ Bundler (Ruby)
+- While Bundler can use environment variables, it doesn't support dynamic credential providers
+- Bundle config requires static credentials that would expire
+- No practical way to auto-refresh tokens
 
 ---
 
 ## Summary Table
 
-| Package Manager | Method | Implementation Effort | Example Available |
-|----------------|--------|---------------------|-------------------|
-| Docker | Credential Helper | Low | ✅ `docker-credential-cloudsmith/` |
-| Python/pip/uv | Keyring Backend | Low | ✅ `python-keyring/` |
-| Maven | Settings.xml + env | Low | ⚠️ Documentation above |
-| Gradle | Credentials API | Low | ⚠️ Documentation above |
-| Helm | Docker creds | None | ℹ️ Uses Docker helper |
-| Conan | Hooks | Medium | ⚠️ Documentation above |
-| Conda | .netrc | Low | ⚠️ Documentation above |
-| Composer | Config/Plugin | Medium | ⚠️ Documentation above |
-| Bundler | Config/Env | Low | ⚠️ Documentation above |
-| Cargo | Credential Provider | Low | ⚠️ Documentation above |
-| Hex | Env vars | Low | ⚠️ Documentation above |
-| sbt | Credential Resolver | Low | ⚠️ Documentation above |
+| Package Manager | Method | Auto Token Refresh | Implementation |
+|----------------|--------|-------------------|----------------|
+| **Maven** | Wrapper script | ✅ Yes | `mvn-with-cloudsmith.sh` |
+| **Gradle** | Exec in build.gradle | ✅ Yes | `getCloudsmithToken()` |
+| **Helm 3** | Docker credentials | ✅ Yes | Uses Docker helper |
+| **Helm 2** | Wrapper script | ✅ Yes | Manual repo add with token |
+| **Conan** | Hooks | ✅ Yes | `cloudsmith_auth.py` hook |
+| **Composer** | Wrapper script | ✅ Yes | `composer-with-cloudsmith.sh` |
+| **Cargo** | Credential provider | ✅ Yes | `cargo-credential-cloudsmith` |
+| **sbt** | Credential resolver | ✅ Yes | Dynamic in `credentials.sbt` |
+| **Conda** | ❌ Not supported | No | No dynamic mechanism |
+| **Hex** | ❌ Not supported | No | No dynamic mechanism |
+| **Bundler** | ❌ Not supported | No | No dynamic mechanism |
 
-**Legend:**
-- ✅ Full example implementation provided
-- ⚠️ Documentation and code snippets provided
-- ℹ️ Uses existing credential helper
-- **Low**: Simple configuration or script
-- **Medium**: Requires plugin/extension development
+✅ = Full support with automatic token refresh  
+❌ = Not supported due to lack of dynamic credential mechanisms
 
 ## Contributing
 
-If you create credential helpers for other package managers, please contribute them to this directory!
+If you create credential helpers for other package managers or improve existing ones, please contribute them to this directory!
