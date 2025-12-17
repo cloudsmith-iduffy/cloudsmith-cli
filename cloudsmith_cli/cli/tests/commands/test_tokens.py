@@ -1,8 +1,9 @@
+import os
 from unittest.mock import patch
 
 import pytest
 
-from cloudsmith_cli.cli.commands.tokens import list_tokens, refresh
+from cloudsmith_cli.cli.commands.tokens import get, list_tokens, refresh
 from cloudsmith_cli.core.api.exceptions import ApiException
 
 
@@ -118,3 +119,72 @@ class TestRefreshTokenCommand:
             "API error" in error_content
             or "Failed to refresh the token" in error_content
         )
+
+
+class TestGetTokenCommand:
+    """Test suite for the 'tokens get' command."""
+
+    def test_get_token_with_api_key(self, runner):
+        """Test getting token when API key is set."""
+        with patch.dict(os.environ, {"CLOUDSMITH_API_HOST": "https://api.cloudsmith.io"}):
+            result = runner.invoke(get, ["-k", "test_api_key_123"], catch_exceptions=False)
+        
+        assert result.exit_code == 0
+        assert result.output.strip() == "test_api_key_123"
+
+    def test_get_token_with_saml(self, runner):
+        """Test getting token when SAML access token exists in keyring."""
+        with patch("cloudsmith_cli.core.keyring.get_access_token") as mock_get_access_token, \
+             patch("cloudsmith_cli.core.keyring.should_refresh_access_token") as mock_should_refresh:
+            mock_get_access_token.return_value = "saml_access_token_456"
+            mock_should_refresh.return_value = False
+            
+            # Use env param to isolate environment and ensure no API key
+            result = runner.invoke(
+                get,
+                [],
+                catch_exceptions=False,
+                env={"CLOUDSMITH_API_HOST": "https://api.cloudsmith.io"}
+            )
+        
+        assert result.exit_code == 0
+        assert result.output.strip() == "saml_access_token_456"
+
+    def test_get_token_no_auth(self, runner):
+        """Test getting token when no authentication is available."""
+        with patch("cloudsmith_cli.core.keyring.get_access_token") as mock_get_access_token, \
+             patch("cloudsmith_cli.cli.commands.tokens.detect_ci_environment") as mock_detect_ci:
+            mock_get_access_token.return_value = None
+            mock_detect_ci.return_value = (None, None)
+            
+            result = runner.invoke(
+                get,
+                [],
+                catch_exceptions=False,
+                env={"CLOUDSMITH_API_HOST": "https://api.cloudsmith.io"}
+            )
+        
+        assert result.exit_code == 1
+        assert "No authentication token found" in result.output
+
+    def test_get_token_with_ci_environment(self, runner):
+        """Test getting token in a CI/CD environment."""
+        with patch("cloudsmith_cli.core.keyring.get_access_token") as mock_get_access_token, \
+             patch("cloudsmith_cli.cli.commands.tokens.detect_ci_environment") as mock_detect_ci, \
+             patch("cloudsmith_cli.cli.commands.tokens.get_ci_oidc_token") as mock_get_oidc, \
+             patch("cloudsmith_cli.cli.commands.tokens.exchange_oidc_token") as mock_exchange:
+            
+            mock_get_access_token.return_value = None
+            mock_detect_ci.return_value = ("github", "ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+            mock_get_oidc.return_value = "github_oidc_token"
+            mock_exchange.return_value = "cloudsmith_token_789"
+            
+            result = runner.invoke(
+                get,
+                [],
+                catch_exceptions=False,
+                env={"CLOUDSMITH_API_HOST": "https://api.cloudsmith.io"}
+            )
+        
+        assert result.exit_code == 0
+        assert result.output.strip() == "cloudsmith_token_789"

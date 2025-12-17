@@ -2,8 +2,11 @@ import click
 
 from ...core.api import exceptions, user as api
 from ...core.config import create_config_files, new_config_messaging
+from ...core import keyring
 from .. import command, decorators
 from ..exceptions import handle_api_exceptions
+from ..oidc import detect_ci_environment, exchange_oidc_token, get_ci_oidc_token
+from ..saml import create_configured_session
 from ..utils import maybe_print_as_json, maybe_spinner
 from .main import main
 
@@ -233,3 +236,67 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
                 exc, ctx, opts, save_config=save_config, force=force, json=json
             )
             return new_token
+
+
+@tokens.command()
+@decorators.common_cli_config_options
+@decorators.common_cli_output_options
+@decorators.common_api_auth_options
+@decorators.initialise_api
+@click.pass_context
+def get(ctx, opts):
+    """Get the current authentication token for the active session.
+    
+    This command intelligently detects and returns the appropriate authentication
+    token based on the current environment:
+    
+    - If using an API key (from config or environment), returns the API key
+    - If authenticated via SAML, returns the SAML JWT access token
+    - If running in a CI/CD environment (GitHub Actions, GitLab CI, CircleCI,
+      AWS, Azure), exchanges the provider's OIDC token for a Cloudsmith token
+    
+    This is useful for credential helpers, scripts, and other tools that need
+    to authenticate with Cloudsmith programmatically.
+    """
+    # Check if API key is already configured
+    if opts.api_key:
+        click.echo(opts.api_key)
+        return
+    
+    # Check if we have a SAML access token in the keyring
+    access_token = keyring.get_access_token(opts.api_host)
+    if access_token:
+        click.echo(access_token)
+        return
+    
+    # Try to get OIDC token from CI/CD environment
+    provider, _ = detect_ci_environment()
+    if provider:
+        oidc_token = get_ci_oidc_token()
+        if oidc_token:
+            try:
+                session = create_configured_session(opts)
+                cloudsmith_token = exchange_oidc_token(
+                    opts.api_host,
+                    oidc_token,
+                    provider,
+                    session=session
+                )
+                if cloudsmith_token:
+                    click.echo(cloudsmith_token)
+                    return
+            except Exception as exc:
+                if opts.debug:
+                    click.echo(f"Debug: OIDC token exchange failed: {exc}", err=True)
+                # Fall through to error message
+    
+    # No token found
+    click.secho(
+        "No authentication token found. Please authenticate using one of these methods:",
+        fg="red",
+        err=True
+    )
+    click.echo("  1. Set CLOUDSMITH_API_KEY environment variable", err=True)
+    click.echo("  2. Run 'cloudsmith login' to get an API key", err=True)
+    click.echo("  3. Run 'cloudsmith auth -o <org>' for SAML authentication", err=True)
+    ctx.exit(1)
