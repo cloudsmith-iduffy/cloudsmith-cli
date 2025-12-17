@@ -18,8 +18,12 @@ password $TOKEN"
 # Remove existing Cloudsmith entry if present
 if [ -f "$NETRC_FILE" ]; then
     # Create temp file without Cloudsmith entries
-    grep -v "swift.cloudsmith.io" "$NETRC_FILE" > "$NETRC_FILE.tmp" || true
-    mv "$NETRC_FILE.tmp" "$NETRC_FILE"
+    if grep -v "swift.cloudsmith.io" "$NETRC_FILE" > "$NETRC_FILE.tmp" 2>/dev/null; then
+        mv "$NETRC_FILE.tmp" "$NETRC_FILE"
+    else
+        # If grep found nothing or failed, create empty file
+        touch "$NETRC_FILE"
+    fi
 fi
 
 # Add new entry
