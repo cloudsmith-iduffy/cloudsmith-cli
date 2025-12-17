@@ -316,6 +316,144 @@ This approach dynamically fetches tokens on each sbt invocation, so tokens never
 
 ---
 
+### ✅ npm (JavaScript/Node.js)
+
+**Support**: Yes - .npmrc with wrapper script or environment variables
+
+npm supports authentication via `.npmrc` configuration files and environment variables.
+
+**Recommended Approach** - Wrapper Script (see `examples/npm/`):
+
+```bash
+#!/bin/bash
+TOKEN=$(cloudsmith tokens get ${CLOUDSMITH_OIDC_SLUG:+--oidc-slug $CLOUDSMITH_OIDC_SLUG})
+npm config set //npm.cloudsmith.io/:_authToken "$TOKEN"
+npm "$@"
+```
+
+**Usage**:
+```bash
+chmod +x npm-with-cloudsmith.sh
+export CLOUDSMITH_OIDC_SLUG=my-org
+./npm-with-cloudsmith.sh install
+```
+
+---
+
+### ✅ NuGet (.NET)
+
+**Support**: Yes - Credential provider plugin
+
+NuGet supports external credential providers through its plugin protocol.
+
+**Implementation** (see `examples/nuget/`):
+
+The credential provider plugin integrates with dotnet CLI, NuGet.exe, and MSBuild to provide automatic authentication.
+
+**Installation**:
+```bash
+mkdir -p ~/.nuget/plugins/netcore/CredentialProvider.Cloudsmith
+cp cloudsmith-nuget-credprovider ~/.nuget/plugins/netcore/CredentialProvider.Cloudsmith/
+chmod +x ~/.nuget/plugins/netcore/CredentialProvider.Cloudsmith/cloudsmith-nuget-credprovider
+```
+
+---
+
+### ✅ Dart/Pub
+
+**Support**: Yes - dart pub token command
+
+Dart's pub tool has built-in support for token-based authentication.
+
+**Recommended Approach** (see `examples/dart/`):
+
+```bash
+TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
+dart pub token add https://dart.cloudsmith.io/my-org/my-repo/ --env-var CLOUDSMITH_TOKEN
+export CLOUDSMITH_TOKEN="$TOKEN"
+dart pub get
+```
+
+---
+
+### ✅ Terraform
+
+**Support**: Yes - Credential helper protocol
+
+Terraform has full support for external credential helpers.
+
+**Implementation** (see `examples/terraform/`):
+
+```hcl
+# .terraformrc
+credentials_helper "cloudsmith" {
+  args = []
+}
+```
+
+The `terraform-credentials-cloudsmith` helper automatically provides credentials for Cloudsmith Terraform registries.
+
+---
+
+### ✅ Swift Package Manager
+
+**Support**: Yes - .netrc file
+
+Swift Package Manager uses `.netrc` for authentication.
+
+**Recommended Approach** (see `examples/swift/`):
+
+```bash
+TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
+echo "machine swift.cloudsmith.io login token password $TOKEN" > ~/.netrc
+chmod 600 ~/.netrc
+```
+
+**Note**: Tokens expire after ~12 hours; use the wrapper script for automatic refresh.
+
+---
+
+### ✅ Go Modules
+
+**Support**: Yes - .netrc file
+
+Go modules use `.netrc` for authentication with private proxies.
+
+**Recommended Approach** (see `examples/go/`):
+
+```bash
+TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
+echo "machine go.cloudsmith.io login token password $TOKEN" > ~/.netrc
+chmod 600 ~/.netrc
+export GOPRIVATE="go.cloudsmith.io/my-org/*"
+```
+
+**Note**: Tokens expire after ~12 hours; use the wrapper script for automatic refresh.
+
+---
+
+### ✅ CRAN (R)
+
+**Support**: Yes - renv with custom headers
+
+R's renv package supports custom HTTP headers for authentication.
+
+**Implementation** (see `examples/cran/`):
+
+```r
+# cloudsmith-auth.R
+options(
+  renv.download.headers = function(url) {
+    if (grepl("cloudsmith.io", url)) {
+      token <- system("cloudsmith tokens get", intern = TRUE)
+      return(c(Authorization = paste0("Bearer ", token)))
+    }
+  }
+)
+```
+
+---
+
 ## Removed/Unsupported Package Managers
 
 The following package managers have been removed from this guide because they don't provide adequate mechanisms for dynamic credential retrieval and tokens expire after 12 hours:
@@ -335,25 +473,42 @@ The following package managers have been removed from this guide because they do
 - Bundle config requires static credentials that would expire
 - No practical way to auto-refresh tokens
 
+### ❌ CocoaPods (iOS/macOS)
+- No external credential helper support
+- Only supports `.netrc` for Git-based private repos
+- CDN approach doesn't support authentication at all
+- Limited to basic auth without dynamic token refresh
+
 ---
 
 ## Summary Table
 
 | Package Manager | Method | Auto Token Refresh | Implementation |
 |----------------|--------|-------------------|----------------|
+| **Docker** | Credential helper | ✅ Yes | `docker-credential-cloudsmith` |
+| **Python/pip** | Keyring backend | ✅ Yes | `cloudsmith_keyring.py` |
+| **npm** | Wrapper script + .npmrc | ✅ Yes | `npm-with-cloudsmith.sh` |
+| **NuGet** | Credential provider | ✅ Yes | `cloudsmith-nuget-credprovider` |
+| **Dart** | dart pub token | ✅ Yes | `dart-pub-with-cloudsmith.sh` |
 | **Maven** | Wrapper script | ✅ Yes | `mvn-with-cloudsmith.sh` |
 | **Gradle** | Exec in build.gradle | ✅ Yes | `getCloudsmithToken()` |
 | **Helm 3** | Docker credentials | ✅ Yes | Uses Docker helper |
-| **Helm 2** | Wrapper script | ✅ Yes | Manual repo add with token |
+| **Helm 2** | Wrapper script | ⚠️ Manual | Manual repo add with token |
 | **Conan** | Hooks | ✅ Yes | `cloudsmith_auth.py` hook |
 | **Composer** | Wrapper script | ✅ Yes | `composer-with-cloudsmith.sh` |
 | **Cargo** | Credential provider | ✅ Yes | `cargo-credential-cloudsmith` |
 | **sbt** | Credential resolver | ✅ Yes | Dynamic in `credentials.sbt` |
+| **Terraform** | Credential helper | ✅ Yes | `terraform-credentials-cloudsmith` |
+| **Swift** | .netrc script | ⚠️ Manual | `setup-swift-auth.sh` |
+| **Go** | .netrc script | ⚠️ Manual | `setup-go-auth.sh` |
+| **R/CRAN** | renv headers | ✅ Yes | `cloudsmith-auth.R` |
 | **Conda** | ❌ Not supported | No | No dynamic mechanism |
 | **Hex** | ❌ Not supported | No | No dynamic mechanism |
 | **Bundler** | ❌ Not supported | No | No dynamic mechanism |
+| **CocoaPods** | ❌ Not supported | No | No credential helper support |
 
 ✅ = Full support with automatic token refresh  
+⚠️ = Requires manual refresh (tokens expire after 12 hours)  
 ❌ = Not supported due to lack of dynamic credential mechanisms
 
 ## Contributing

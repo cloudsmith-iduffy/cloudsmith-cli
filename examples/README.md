@@ -4,47 +4,107 @@ This directory contains example implementations of credential helpers for variou
 
 ## Available Examples
 
-### Docker Credential Helper
+### Container & Language-Specific Registries
+
+#### Docker Credential Helper
 - **Path**: `docker-credential-cloudsmith/`
 - **Status**: ✅ Full implementation
 - **Description**: Docker credential helper that integrates with Docker to provide automatic authentication to Cloudsmith Docker registries
 - **Reference**: Similar to [amazon-ecr-credential-helper](https://github.com/awslabs/amazon-ecr-credential-helper)
 
-### Python/pip/uv Keyring
+#### Python/pip/uv Keyring
 - **Path**: `python-keyring/`
 - **Status**: ✅ Full implementation
 - **Description**: Python keyring backend for pip, uv, and other Python tools that use keyring for authentication
 - **Reference**: Similar to [artifacts-keyring](https://github.com/microsoft/artifacts-keyring)
 
-### Maven
-- **Path**: `maven/`
+#### npm (JavaScript/Node.js)
+- **Path**: `npm/`
 - **Status**: ✅ Full implementation
-- **Description**: Credential helper and configuration for Maven repositories
+- **Description**: .npmrc configuration and wrapper script for npm, yarn, and pnpm
 
-### Gradle
-- **Path**: `gradle/`
+#### NuGet (.NET)
+- **Path**: `nuget/`
 - **Status**: ✅ Full implementation
-- **Description**: Dynamic credential retrieval for Gradle builds
+- **Description**: Credential provider plugin for dotnet CLI, NuGet.exe, and MSBuild
 
-### Conan
-- **Path**: `conan/`
+#### Dart/Pub
+- **Path**: `dart/`
 - **Status**: ✅ Full implementation
-- **Description**: Hook-based authentication for Conan package manager
+- **Description**: Integration with dart pub token command for Dart package authentication
 
-### Composer (PHP)
-- **Path**: `composer/`
-- **Status**: ✅ Full implementation
-- **Description**: Wrapper script for authentication with Composer
-
-### Cargo (Rust)
+#### Cargo (Rust)
 - **Path**: `cargo/`
 - **Status**: ✅ Full implementation
 - **Description**: Credential provider for Cargo (Rust 1.68+)
 
-### sbt (Scala)
+#### Go Modules
+- **Path**: `go/`
+- **Status**: ✅ Full implementation
+- **Description**: .netrc-based authentication for Go module proxies
+
+#### Swift Package Manager
+- **Path**: `swift/`
+- **Status**: ✅ Full implementation
+- **Description**: .netrc and swift package-registry login integration
+
+#### CRAN (R)
+- **Path**: `cran/`
+- **Status**: ✅ Full implementation
+- **Description**: renv-based authentication with custom headers for R packages
+
+### Build Tools & Infrastructure
+
+#### Maven
+- **Path**: `maven/`
+- **Status**: ✅ Full implementation
+- **Description**: Credential helper and configuration for Maven repositories
+
+#### Gradle
+- **Path**: `gradle/`
+- **Status**: ✅ Full implementation
+- **Description**: Dynamic credential retrieval for Gradle builds
+
+#### sbt (Scala)
 - **Path**: `sbt/`
 - **Status**: ✅ Full implementation
 - **Description**: Credential resolver for sbt builds
+
+#### Conan
+- **Path**: `conan/`
+- **Status**: ✅ Full implementation
+- **Description**: Hook-based authentication for Conan package manager
+
+#### Composer (PHP)
+- **Path**: `composer/`
+- **Status**: ✅ Full implementation
+- **Description**: Wrapper script for authentication with Composer
+
+#### Terraform
+- **Path**: `terraform/`
+- **Status**: ✅ Full implementation
+- **Description**: Full credential helper for Terraform registry authentication
+
+## Package Manager Support Summary
+
+| Package Manager | Method | Auto Refresh | Complexity |
+|----------------|--------|--------------|-----------|
+| Docker | Native credential helper | ✅ Yes | Low |
+| Python/pip | Keyring backend | ✅ Yes | Low |
+| npm | Wrapper + .npmrc | ✅ Yes | Low |
+| NuGet | Credential provider plugin | ✅ Yes | Medium |
+| Dart | dart pub token | ✅ Yes | Low |
+| Cargo | Credential provider | ✅ Yes | Low |
+| Go | .netrc | ⚠️ Manual refresh | Low |
+| Swift | .netrc | ⚠️ Manual refresh | Low |
+| R/CRAN | renv headers | ✅ Yes | Medium |
+| Maven | Wrapper script | ✅ Yes | Low |
+| Gradle | Exec in build script | ✅ Yes | Low |
+| sbt | Credential resolver | ✅ Yes | Medium |
+| Conan | Hooks | ✅ Yes | Medium |
+| Composer | Wrapper script | ✅ Yes | Low |
+| Terraform | Credential helper | ✅ Yes | Low |
+| Helm | Docker credentials | ✅ Yes | Low |
 
 ## Removed Package Managers
 
