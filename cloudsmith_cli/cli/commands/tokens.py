@@ -280,7 +280,7 @@ def get(ctx, opts, oidc_slug):
         return
 
     # Try to get OIDC token
-    provider, _ = detect_oidc_provider()
+    provider = detect_oidc_provider()
     if provider:
         oidc_token = get_oidc_token()
         if oidc_token:
