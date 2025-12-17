@@ -1,6 +1,9 @@
 import click
+import requests
 
-from ...core.api import exceptions, user as api
+from ...core.api import exceptions as api_exceptions
+from ...core.api import user as api
+from ...core.api.exceptions import ApiException
 from ...core.config import create_config_files, new_config_messaging
 from ...core import keyring
 from .. import command, decorators
@@ -149,7 +152,7 @@ def refresh_existing_token_interactive(
         try:
             with handle_api_exceptions(ctx, opts=opts, context_msg=context_msg):
                 api_tokens = api.list_user_tokens()
-        except exceptions.ApiException as exc:
+        except api_exceptions.ApiException as exc:
             # If we can't list tokens due to API error, fall back to creating a new one
             if opts.debug:
                 click.echo(f"Debug: Failed to list tokens with error: {exc}", err=True)
@@ -197,7 +200,7 @@ def refresh_existing_token_interactive(
             click.echo(f"New token value: {click.style(new_token.key, fg='magenta')}")
 
         return new_token
-    except exceptions.ApiException as exc:
+    except api_exceptions.ApiException as exc:
         # If refresh fails due to API error, offer to create a new token instead
         if opts.debug:
             click.echo(f"\nDebug: Refresh failed with error: {exc}", err=True)
@@ -225,7 +228,7 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
 
         return new_token
 
-    except exceptions.ApiException as exc:
+    except api_exceptions.ApiException as exc:
         if exc.status == 401:
             click.echo(f"{exc.detail}")
             return
@@ -282,7 +285,7 @@ def get(ctx, opts):
                 if cloudsmith_token:
                     click.echo(cloudsmith_token)
                     return
-            except Exception as exc:
+            except (ApiException, requests.RequestException) as exc:
                 if opts.debug:
                     click.echo(f"Debug: OIDC token exchange failed: {exc}", err=True)
                 # Fall through to error message

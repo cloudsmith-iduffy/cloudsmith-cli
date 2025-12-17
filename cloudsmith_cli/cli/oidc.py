@@ -31,6 +31,7 @@ def detect_ci_environment():
         return ("aws", "AWS_WEB_IDENTITY_TOKEN_FILE")
 
     # Azure Pipelines
+    # Note: SYSTEM_OIDCTOKEN is only available in Azure Pipelines with OIDC enabled
     if os.getenv("AZURE_PIPELINES") == "true" or os.getenv(
         "SYSTEM_TEAMFOUNDATIONCOLLECTIONURI"
     ):
@@ -73,7 +74,7 @@ def get_ci_oidc_token():
         token_file = os.getenv(token_env_var)
         if token_file and os.path.exists(token_file):
             try:
-                with open(token_file, "r") as f:
+                with open(token_file, "r", encoding="utf-8") as f:
                     return f.read().strip()
             except (IOError, OSError):
                 return None
@@ -101,8 +102,11 @@ def exchange_oidc_token(api_host, oidc_token, provider, session=None):
 
     Note:
         The OIDC token exchange endpoint and payload format should be verified
-        against the Cloudsmith API documentation. This implementation assumes
-        a generic OIDC token exchange endpoint.
+        against the Cloudsmith API documentation. This implementation follows
+        a standard pattern for OIDC token exchange. The actual endpoint may vary
+        depending on the Cloudsmith API version and configuration.
+
+        TODO: Verify the exact API endpoint format with Cloudsmith API documentation.
     """
     if session is None:
         session = requests.Session()

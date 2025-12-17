@@ -134,7 +134,8 @@ class TestGetTokenCommand:
             if hasattr(config, "api_key"):
                 config.api_key = {}
             cloudsmith_api.Configuration.set_default(config)
-        except Exception:
+        except (AttributeError, KeyError):
+            # Ignore errors during cleanup
             pass
 
         yield
@@ -145,7 +146,8 @@ class TestGetTokenCommand:
             if hasattr(config, "api_key"):
                 config.api_key = {}
             cloudsmith_api.Configuration.set_default(config)
-        except Exception:
+        except (AttributeError, KeyError):
+            # Ignore errors during cleanup
             pass
 
     def test_get_token_with_api_key(self, runner):
