@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloudsmith-keyring"
+version = "0.1.0"
+description = "Keyring backend for Cloudsmith Python repositories"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Cloudsmith", email = "support@cloudsmith.io"}
+]
+keywords = ["cloudsmith", "keyring", "pip", "authentication"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "keyring>=20.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.10",
+]
+
+[project.urls]
+Homepage = "https://cloudsmith.io"
+Documentation = "https://help.cloudsmith.io"
+Repository = "https://github.com/cloudsmith-io/cloudsmith-cli"
+
+[tool.setuptools]
+py-modules = ["cloudsmith_keyring"]
