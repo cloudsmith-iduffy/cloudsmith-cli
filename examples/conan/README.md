@@ -84,66 +84,6 @@ conan remote login cloudsmith token -p "$TOKEN"
 conan install mypackage/1.0@user/channel -r cloudsmith
 ```
 
-## CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-name: Conan Build
-
-on: [push]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      
-      - name: Install Conan and Cloudsmith CLI
-        run: |
-          pip install conan cloudsmith-cli
-      
-      - name: Install Cloudsmith hook
-        run: |
-          mkdir -p ~/.conan/hooks
-          cp cloudsmith_auth.py ~/.conan/hooks/
-      
-      - name: Add Cloudsmith remote
-        run: conan remote add cloudsmith https://conan.cloudsmith.io/my-org/my-repo/
-      
-      - name: Configure OIDC
-        run: echo "CLOUDSMITH_OIDC_SLUG=my-org" >> $GITHUB_ENV
-      
-      - name: Build and upload
-        run: |
-          conan create . mypackage/1.0@user/channel
-          conan upload mypackage/1.0@user/channel -r cloudsmith --all
-```
-
-### GitLab CI
-
-```yaml
-build:
-  image: conanio/gcc11
-  before_script:
-    - pip install cloudsmith-cli
-    - mkdir -p ~/.conan/hooks
-    - cp cloudsmith_auth.py ~/.conan/hooks/
-    - conan remote add cloudsmith https://conan.cloudsmith.io/my-org/my-repo/
-    - export CLOUDSMITH_OIDC_SLUG=my-org
-  script:
-    - conan create . mypackage/1.0@user/channel
-    - conan upload mypackage/1.0@user/channel -r cloudsmith --all
-```
-
 ## Conan 2.x Configuration
 
 For Conan 2.x, the hook system has changed. Use a different approach:

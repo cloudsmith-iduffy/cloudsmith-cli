@@ -1,6 +1,6 @@
-# Composer Integration for Cloudsmith
+# Composer Plugin for Cloudsmith
 
-Composer authentication for Cloudsmith repositories.
+Composer plugin for automatic authentication with Cloudsmith repositories using `cloudsmith tokens get`.
 
 ## Installation
 
@@ -9,59 +9,69 @@ Composer authentication for Cloudsmith repositories.
 - Composer 2.x
 - Cloudsmith CLI: `pip install cloudsmith-cli`
 
+### Install the Plugin
+
+Copy the plugin script to a location where Composer can execute it:
+
+```bash
+chmod +x cloudsmith-auth.php
+# Option 1: Project-specific
+mkdir -p vendor/cloudsmith
+cp cloudsmith-auth.php vendor/cloudsmith/
+
+# Option 2: System-wide
+sudo cp cloudsmith-auth.php /usr/local/bin/cloudsmith-composer-auth
+```
+
 ## Configuration
 
-### Option 1: Environment Variable (Recommended)
+### Option 1: Plugin Approach (Recommended - Auto Refresh)
 
-```bash
-# Get token
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
+Create a custom Composer plugin that fetches tokens dynamically.
 
-# Configure Composer
-composer config --global http-basic.composer.cloudsmith.io token "$CLOUDSMITH_TOKEN"
-```
-
-### Option 2: Auth.json
-
-Create or update `~/.composer/auth.json`:
-
+**composer.json** (add to your project):
 ```json
 {
-  "http-basic": {
-    "composer.cloudsmith.io": {
-      "username": "token",
-      "password": "YOUR_TOKEN_HERE"
-    }
-  }
-}
-```
-
-Update with fresh token:
-```bash
-TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-composer config --global http-basic.composer.cloudsmith.io token "$TOKEN"
-```
-
-### Option 3: Inline in composer.json
-
-**Not recommended for security**, but possible:
-
-```json
-{
+  "scripts": {
+    "pre-install-cmd": "@cloudsmith-auth",
+    "pre-update-cmd": "@cloudsmith-auth",
+    "cloudsmith-auth": [
+      "php -r \"$token = trim(shell_exec('cloudsmith tokens get' . (getenv('CLOUDSMITH_OIDC_SLUG') ? ' --oidc-slug ' . getenv('CLOUDSMITH_OIDC_SLUG') : '')));  echo shell_exec('composer config http-basic.composer.cloudsmith.io token ' . $token);\"" 
+    ]
+  },
   "repositories": [
     {
       "type": "composer",
-      "url": "https://composer.cloudsmith.io/my-org/my-repo/",
-      "options": {
-        "http": {
-          "header": [
-            "Authorization: Bearer ${CLOUDSMITH_TOKEN}"
-          ]
-        }
-      }
+      "url": "https://composer.cloudsmith.io/my-org/my-repo/"
     }
   ]
 }
+```
+
+This automatically fetches a fresh token before each `composer install` or `composer update`.
+
+### Option 2: Wrapper Script
+
+Use a wrapper that sets authentication before running composer:
+
+**composer-with-cloudsmith.sh**:
+```bash
+#!/bin/bash
+# Get token dynamically
+TOKEN=$(cloudsmith tokens get ${CLOUDSMITH_OIDC_SLUG:+--oidc-slug $CLOUDSMITH_OIDC_SLUG})
+
+# Configure Composer
+composer config http-basic.composer.cloudsmith.io token "$TOKEN"
+
+# Run composer command
+composer "$@"
+```
+
+Make it executable and use it:
+```bash
+chmod +x composer-with-cloudsmith.sh
+./composer-with-cloudsmith.sh install
+./composer-with-cloudsmith.sh update
 ```
 
 ## Usage
@@ -83,73 +93,43 @@ composer config --global http-basic.composer.cloudsmith.io token "$TOKEN"
 }
 ```
 
-### Install Dependencies
+### With Plugin (Automatic)
 
 ```bash
-# Set token
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-composer config http-basic.composer.cloudsmith.io token "$CLOUDSMITH_TOKEN"
-
-# Install
+# Token is fetched automatically via pre-install script
 composer install
 ```
 
-## CI/CD Integration
+### With Wrapper Script
 
-### GitHub Actions
-
-```yaml
-name: Composer Build
-
-on: [push]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          tools: composer
-      
-      - name: Install Cloudsmith CLI
-        run: pip install cloudsmith-cli
-      
-      - name: Configure Composer authentication
-        run: |
-          TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-          composer config http-basic.composer.cloudsmith.io token "$TOKEN"
-      
-      - name: Install dependencies
-        run: composer install
-```
-
-### GitLab CI
-
-```yaml
-build:
-  image: composer:latest
-  before_script:
-    - apk add --no-cache python3 py3-pip
-    - pip install cloudsmith-cli
-    - TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-    - composer config http-basic.composer.cloudsmith.io token "$TOKEN"
-  script:
-    - composer install
+```bash
+./composer-with-cloudsmith.sh install
 ```
 
 ## Environment Variables
 
-- `CLOUDSMITH_TOKEN`: Pre-fetched token
-- `CLOUDSMITH_OIDC_SLUG`: Organization slug for OIDC
-- `CLOUDSMITH_API_KEY`: API key (alternative)
+- `CLOUDSMITH_OIDC_SLUG`: Organization slug for OIDC authentication (optional)
+- `CLOUDSMITH_API_KEY`: API key (alternative to OIDC)
+
+## Troubleshooting
+
+### "The requested package could not be found"
+
+Ensure Cloudsmith CLI is installed and token can be retrieved:
+```bash
+# Test token retrieval
+cloudsmith tokens get --oidc-slug my-org
+
+# Manually set auth
+composer config http-basic.composer.cloudsmith.io token "$(cloudsmith tokens get --oidc-slug my-org)"
+```
+
+### "401 Unauthorized"
+
+Token may have expired. The plugin/wrapper approach automatically refreshes tokens.
 
 ## Reference
 
 - [Composer Authentication](https://getcomposer.org/doc/articles/authentication-for-private-packages.md)
+- [Composer Scripts](https://getcomposer.org/doc/articles/scripts.md)
 - [Cloudsmith Composer Repositories](https://help.cloudsmith.io/docs/composer-repository)

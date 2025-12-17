@@ -206,54 +206,6 @@ export CLOUDSMITH_OIDC_SLUG=my-org
 gradle publish
 ```
 
-## CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-name: Gradle Build
-
-on: [push]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-      
-      - name: Install Cloudsmith CLI
-        run: pip install cloudsmith-cli
-      
-      - name: Configure OIDC
-        run: echo "CLOUDSMITH_OIDC_SLUG=my-org" >> $GITHUB_ENV
-      
-      - name: Build and publish
-        run: gradle publish
-```
-
-### GitLab CI
-
-```yaml
-build:
-  image: gradle:jdk17
-  before_script:
-    - pip install cloudsmith-cli
-    - export CLOUDSMITH_OIDC_SLUG=my-org
-  script:
-    - gradle publish
-```
-
 ## Environment Variables
 
 - `CLOUDSMITH_OIDC_SLUG`: Organization slug for OIDC authentication

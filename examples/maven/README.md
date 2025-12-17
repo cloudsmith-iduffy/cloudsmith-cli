@@ -6,84 +6,118 @@ Maven integration for Cloudsmith using dynamic credential retrieval via `cloudsm
 
 ### Prerequisites
 
-- Maven 3.x or later
+- Maven 3.2.1 or later
 - Cloudsmith CLI: `pip install cloudsmith-cli`
-
-### Setup
-
-1. Make the credential script executable:
-```bash
-chmod +x cloudsmith-maven-creds
-sudo cp cloudsmith-maven-creds /usr/local/bin/
-```
 
 ## Configuration
 
-### Option 1: Environment Variable (Recommended)
+### Option 1: Maven Extension (Recommended)
 
-Configure Maven to use credentials from environment variables in your `~/.m2/settings.xml`:
+Maven 3.2.1+ supports extensions that can inject credentials dynamically. Create a custom extension or use the shell execution approach:
 
+**pom.xml** with build extension:
+```xml
+<project>
+  <build>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-http</artifactId>
+        <version>3.5.3</version>
+      </extension>
+    </extensions>
+  </build>
+</project>
+```
+
+**~/.m2/settings.xml**:
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>cloudsmith</id>
+      <configuration>
+        <httpHeaders>
+          <property>
+            <name>Authorization</name>
+            <!-- This gets evaluated at runtime -->
+            <value>Bearer ${env.CLOUDSMITH_TOKEN}</value>
+          </property>
+        </httpHeaders>
+      </configuration>
+    </server>
+  </servers>
+</settings>
+```
+
+Then use a wrapper script to set the token:
+```bash
+#!/bin/bash
+# mvn-cloudsmith.sh
+export CLOUDSMITH_TOKEN=$(cloudsmith tokens get ${CLOUDSMITH_OIDC_SLUG:+--oidc-slug $CLOUDSMITH_OIDC_SLUG})
+mvn "$@"
+```
+
+Usage:
+```bash
+chmod +x mvn-cloudsmith.sh
+./mvn-cloudsmith.sh clean install
+./mvn-cloudsmith.sh deploy
+```
+
+### Option 2: Maven Plugin with Exec
+
+Use the exec-maven-plugin to fetch credentials before each build:
+
+**pom.xml**:
+```xml
+<project>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>fetch-cloudsmith-token</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>sh</executable>
+              <arguments>
+                <argument>-c</argument>
+                <argument>cloudsmith tokens get ${env.CLOUDSMITH_OIDC_SLUG}</argument>
+              </arguments>
+              <outputProperty>cloudsmith.token</outputProperty>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+```
+
+**~/.m2/settings.xml**:
 ```xml
 <settings>
   <servers>
     <server>
       <id>cloudsmith</id>
       <username>token</username>
-      <password>${env.CLOUDSMITH_TOKEN}</password>
+      <password>${cloudsmith.token}</password>
     </server>
   </servers>
-  
-  <profiles>
-    <profile>
-      <id>cloudsmith</id>
-      <repositories>
-        <repository>
-          <id>cloudsmith</id>
-          <url>https://maven.cloudsmith.io/my-org/my-repo/</url>
-        </repository>
-      </repositories>
-    </profile>
-  </profiles>
-  
-  <activeProfiles>
-    <activeProfile>cloudsmith</activeProfile>
-  </activeProfiles>
 </settings>
 ```
 
-Then set the token before running Maven:
+Usage:
 ```bash
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
+export CLOUDSMITH_OIDC_SLUG=my-org
 mvn deploy
-```
-
-### Option 2: Dynamic Credential Script
-
-Use a wrapper script that sets credentials dynamically:
-
-**maven-with-cloudsmith.sh**:
-```bash
-#!/bin/bash
-export CLOUDSMITH_TOKEN=$(cloudsmith tokens get ${CLOUDSMITH_OIDC_SLUG:+--oidc-slug $CLOUDSMITH_OIDC_SLUG})
-mvn "$@"
-```
-
-Make it executable:
-```bash
-chmod +x maven-with-cloudsmith.sh
-./maven-with-cloudsmith.sh deploy
-```
-
-### Option 3: Settings Encryption with Script
-
-For settings encryption, create a master password and use it with the credential script:
-
-```bash
-# Generate master password
-mvn --encrypt-master-password $(cloudsmith-maven-creds)
-
-# Encrypt server password
-mvn --encrypt-password $(cloudsmith-maven-creds)
 ```
 
 ## Usage
@@ -126,51 +160,6 @@ mvn deploy
 ```bash
 export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
 mvn install
-```
-
-## CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-name: Maven Build
-
-on: [push]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      
-      - name: Install Cloudsmith CLI
-        run: pip install cloudsmith-cli
-      
-      - name: Set Cloudsmith token
-        run: echo "CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)" >> $GITHUB_ENV
-      
-      - name: Build and deploy
-        run: mvn deploy
-```
-
-### GitLab CI
-
-```yaml
-build:
-  image: maven:3-openjdk-17
-  before_script:
-    - pip install cloudsmith-cli
-    - export CLOUDSMITH_TOKEN=$(cloudsmith tokens get --oidc-slug my-org)
-  script:
-    - mvn deploy
 ```
 
 ## Environment Variables
