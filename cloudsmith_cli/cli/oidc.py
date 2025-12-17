@@ -7,12 +7,12 @@ import requests
 from ..core.api.exceptions import ApiException
 
 
-def detect_ci_environment():
+def detect_oidc_provider():
     """
-    Detect which CI/CD environment we're running in.
+    Detect which OIDC provider credentials are available.
 
     Returns:
-        tuple: (provider_name, token_env_var) or (None, None) if not in CI
+        tuple: (provider_name, token_env_var) or (None, None) if no OIDC token available
     """
     # GitHub Actions
     if os.getenv("GITHUB_ACTIONS") == "true":
@@ -26,8 +26,8 @@ def detect_ci_environment():
     if os.getenv("CIRCLECI") == "true":
         return ("circleci", "CIRCLE_OIDC_TOKEN")
 
-    # AWS CodeBuild
-    if os.getenv("CODEBUILD_BUILD_ID"):
+    # AWS
+    if os.getenv("CODEBUILD_BUILD_ID") or os.getenv("AWS_WEB_IDENTITY_TOKEN_FILE"):
         return ("aws", "AWS_WEB_IDENTITY_TOKEN_FILE")
 
     # Azure Pipelines
@@ -40,15 +40,15 @@ def detect_ci_environment():
     return (None, None)
 
 
-def get_ci_oidc_token():
+def get_oidc_token():
     """
-    Get the OIDC token from the current CI/CD environment.
+    Get the OIDC token from the current environment.
 
     Returns:
         str: The OIDC token, or None if not available
     """
     # pylint: disable=too-many-return-statements
-    provider, token_env_var = detect_ci_environment()
+    provider, token_env_var = detect_oidc_provider()
 
     if not provider:
         return None
@@ -84,38 +84,38 @@ def get_ci_oidc_token():
     return os.getenv(token_env_var)
 
 
-def exchange_oidc_token(api_host, oidc_token, provider, session=None):
+def exchange_oidc_token(api_host, oidc_token, service_slug, session=None):
     """
-    Exchange an OIDC token from a CI/CD provider for a Cloudsmith token.
+    Exchange an OIDC token for a Cloudsmith API token.
 
     Args:
         api_host: The Cloudsmith API host
-        oidc_token: The OIDC token from the CI/CD provider
-        provider: The provider name (github, gitlab, circleci, aws, azure)
+        oidc_token: The OIDC token to exchange
+        service_slug: The service slug (organization slug) for the OIDC provider
         session: Optional requests session to use
 
     Returns:
-        str: The Cloudsmith access token
+        str: The Cloudsmith API token
 
     Raises:
         ApiException: If the exchange fails
 
-    Note:
-        The OIDC token exchange endpoint and payload format should be verified
-        against the Cloudsmith API documentation. This implementation follows
-        a standard pattern for OIDC token exchange. The actual endpoint may vary
-        depending on the Cloudsmith API version and configuration.
-
-        TODO: Verify the exact API endpoint format with Cloudsmith API documentation.
+    Example:
+        The endpoint format is: {api_host}/openid/{org}/
+        The request payload should contain:
+        {
+            "oidc_token": "<token>",
+            "service_slug": "<slug>"
+        }
     """
     if session is None:
         session = requests.Session()
 
     # The endpoint for OIDC token exchange
-    # This follows a common pattern for OIDC token exchange in cloud services
-    exchange_url = f"{api_host}/openid/{provider}/token-exchange/"
+    # Format: https://api.cloudsmith.io/openid/{org}/
+    exchange_url = f"{api_host}/openid/{service_slug}/"
 
-    data = {"token": oidc_token, "provider": provider}
+    data = {"oidc_token": oidc_token, "service_slug": service_slug}
 
     try:
         response = session.post(exchange_url, json=data, timeout=30)

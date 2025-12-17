@@ -8,7 +8,7 @@ from ...core.config import create_config_files, new_config_messaging
 from ...core import keyring
 from .. import command, decorators
 from ..exceptions import handle_api_exceptions
-from ..oidc import detect_ci_environment, exchange_oidc_token, get_ci_oidc_token
+from ..oidc import detect_oidc_provider, exchange_oidc_token, get_oidc_token
 from ..saml import create_configured_session
 from ..utils import maybe_print_as_json, maybe_spinner
 from .main import main
@@ -242,12 +242,19 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
 
 
 @tokens.command()
+@click.option(
+    "-o",
+    "--oidc-slug",
+    "oidc_slug",
+    default=None,
+    help="The service slug (organization) for OIDC token exchange.",
+)
 @decorators.common_cli_config_options
 @decorators.common_cli_output_options
 @decorators.common_api_auth_options
 @decorators.initialise_api
 @click.pass_context
-def get(ctx, opts):
+def get(ctx, opts, oidc_slug):
     """Get the current authentication token for the active session.
 
     This command intelligently detects and returns the appropriate authentication
@@ -255,8 +262,8 @@ def get(ctx, opts):
 
     - If using an API key (from config or environment), returns the API key
     - If authenticated via SAML, returns the SAML JWT access token
-    - If running in a CI/CD environment (GitHub Actions, GitLab CI, CircleCI,
-      AWS, Azure), exchanges the provider's OIDC token for a Cloudsmith token
+    - If OIDC credentials are available (GitHub Actions, GitLab CI, CircleCI,
+      AWS, Azure), exchanges the OIDC token for a Cloudsmith token
 
     This is useful for credential helpers, scripts, and other tools that need
     to authenticate with Cloudsmith programmatically.
@@ -272,15 +279,23 @@ def get(ctx, opts):
         click.echo(access_token)
         return
 
-    # Try to get OIDC token from CI/CD environment
-    provider, _ = detect_ci_environment()
+    # Try to get OIDC token
+    provider, _ = detect_oidc_provider()
     if provider:
-        oidc_token = get_ci_oidc_token()
+        oidc_token = get_oidc_token()
         if oidc_token:
+            if not oidc_slug:
+                click.secho(
+                    "OIDC token detected but no service slug provided. "
+                    "Use --oidc-slug to specify the organization.",
+                    fg="red",
+                    err=True,
+                )
+                ctx.exit(1)
             try:
                 session = create_configured_session(opts)
                 cloudsmith_token = exchange_oidc_token(
-                    opts.api_host, oidc_token, provider, session=session
+                    opts.api_host, oidc_token, oidc_slug, session=session
                 )
                 if cloudsmith_token:
                     click.echo(cloudsmith_token)

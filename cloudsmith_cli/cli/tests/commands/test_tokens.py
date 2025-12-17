@@ -192,12 +192,12 @@ class TestGetTokenCommand:
             with patch(
                 "cloudsmith_cli.core.keyring.get_access_token"
             ) as mock_get_access_token, patch(
-                "cloudsmith_cli.cli.commands.tokens.detect_ci_environment"
-            ) as mock_detect_ci, patch.dict(
+                "cloudsmith_cli.cli.commands.tokens.detect_oidc_provider"
+            ) as mock_detect_oidc, patch.dict(
                 os.environ, {"CLOUDSMITH_API_HOST": "https://api.cloudsmith.io"}
             ):
                 mock_get_access_token.return_value = None
-                mock_detect_ci.return_value = (None, None)
+                mock_detect_oidc.return_value = (None, None)
 
                 result = runner.invoke(get, [], catch_exceptions=False)
 
@@ -207,16 +207,16 @@ class TestGetTokenCommand:
             if saved_api_key:
                 os.environ["CLOUDSMITH_API_KEY"] = saved_api_key
 
-    def test_get_token_with_ci_environment(self, runner):
-        """Test getting token in a CI/CD environment."""
+    def test_get_token_with_oidc(self, runner):
+        """Test getting token with OIDC in any environment."""
         saved_api_key = os.environ.pop("CLOUDSMITH_API_KEY", None)
         try:
             with patch(
                 "cloudsmith_cli.core.keyring.get_access_token"
             ) as mock_get_access_token, patch(
-                "cloudsmith_cli.cli.commands.tokens.detect_ci_environment"
-            ) as mock_detect_ci, patch(
-                "cloudsmith_cli.cli.commands.tokens.get_ci_oidc_token"
+                "cloudsmith_cli.cli.commands.tokens.detect_oidc_provider"
+            ) as mock_detect_oidc, patch(
+                "cloudsmith_cli.cli.commands.tokens.get_oidc_token"
             ) as mock_get_oidc, patch(
                 "cloudsmith_cli.cli.commands.tokens.exchange_oidc_token"
             ) as mock_exchange, patch.dict(
@@ -224,14 +224,16 @@ class TestGetTokenCommand:
             ):
 
                 mock_get_access_token.return_value = None
-                mock_detect_ci.return_value = (
+                mock_detect_oidc.return_value = (
                     "github",
                     "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
                 )
                 mock_get_oidc.return_value = "github_oidc_token"
                 mock_exchange.return_value = "cloudsmith_token_789"
 
-                result = runner.invoke(get, [], catch_exceptions=False)
+                result = runner.invoke(
+                    get, ["--oidc-slug", "my-org"], catch_exceptions=False
+                )
 
             assert result.exit_code == 0
             assert result.output.strip() == "cloudsmith_token_789"
