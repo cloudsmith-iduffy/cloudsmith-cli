@@ -1,15 +1,10 @@
 import click
-import requests
 
 from ...core.api import exceptions as api_exceptions
 from ...core.api import user as api
-from ...core.api.exceptions import ApiException
 from ...core.config import create_config_files, new_config_messaging
-from ...core import keyring
 from .. import command, decorators
 from ..exceptions import handle_api_exceptions
-from ..oidc import detect_oidc_provider, exchange_oidc_token, get_oidc_token
-from ..saml import create_configured_session
 from ..utils import maybe_print_as_json, maybe_spinner
 from .main import main
 
@@ -257,55 +252,29 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
 def get(ctx, opts, oidc_slug):
     """Get the current authentication token for the active session.
 
-    This command intelligently detects and returns the appropriate authentication
-    token based on the current environment:
+    This command uses the credential provider chain to intelligently detect
+    and return the appropriate authentication token:
 
-    - If using an API key (from config or environment), returns the API key
-    - If authenticated via SAML, returns the SAML JWT access token
-    - If OIDC credentials are available (GitHub Actions, GitLab CI, CircleCI,
-      AWS, Azure), exchanges the OIDC token for a Cloudsmith token
+    1. Environment variable (CLOUDSMITH_API_KEY)
+    2. Config file (config.ini)
+    3. SAML keyring (from 'cloudsmith login --saml')
+    4. OIDC token exchange (GitHub Actions, GitLab CI, AWS, Azure, etc.)
 
     This is useful for credential helpers, scripts, and other tools that need
     to authenticate with Cloudsmith programmatically.
     """
-    # Check if API key is already configured
-    if opts.api_key:
-        click.echo(opts.api_key)
+    # Use credential provider chain
+    from ...core import credentials as creds_module
+    
+    credentials = creds_module.get_credentials(opts=opts, oidc_slug=oidc_slug)
+    
+    if credentials:
+        if opts.debug:
+            click.echo(f"Debug: Using credentials from {credentials.source}", err=True)
+        click.echo(credentials.api_key)
         return
 
-    # Check if we have a SAML access token in the keyring
-    access_token = keyring.get_access_token(opts.api_host)
-    if access_token:
-        click.echo(access_token)
-        return
-
-    # Try to get OIDC token
-    provider = detect_oidc_provider()
-    if provider:
-        oidc_token = get_oidc_token()
-        if oidc_token:
-            if not oidc_slug:
-                click.secho(
-                    "OIDC token detected but no service slug provided. "
-                    "Use --oidc-slug to specify the organization.",
-                    fg="red",
-                    err=True,
-                )
-                ctx.exit(1)
-            try:
-                session = create_configured_session(opts)
-                cloudsmith_token = exchange_oidc_token(
-                    opts.api_host, oidc_token, oidc_slug, session=session
-                )
-                if cloudsmith_token:
-                    click.echo(cloudsmith_token)
-                    return
-            except (ApiException, requests.RequestException) as exc:
-                if opts.debug:
-                    click.echo(f"Debug: OIDC token exchange failed: {exc}", err=True)
-                # Fall through to error message
-
-    # No token found
+    # No credentials found
     click.secho(
         "No authentication token found. Please authenticate using one of these methods:",
         fg="red",
@@ -313,5 +282,6 @@ def get(ctx, opts, oidc_slug):
     )
     click.echo("  1. Set CLOUDSMITH_API_KEY environment variable", err=True)
     click.echo("  2. Run 'cloudsmith login' to get an API key", err=True)
-    click.echo("  3. Run 'cloudsmith auth -o <org>' for SAML authentication", err=True)
+    click.echo("  3. Run 'cloudsmith login --saml -o <org>' for SAML authentication", err=True)
+    click.echo("  4. Ensure OIDC credentials are available (CI/CD environments)", err=True)
     ctx.exit(1)
