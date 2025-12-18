@@ -1,6 +1,7 @@
 import click
 
-from ...core.api import exceptions, user as api
+from ...core.api import exceptions as api_exceptions
+from ...core.api import user as api
 from ...core.config import create_config_files, new_config_messaging
 from .. import command, decorators
 from ..exceptions import handle_api_exceptions
@@ -146,7 +147,7 @@ def refresh_existing_token_interactive(
         try:
             with handle_api_exceptions(ctx, opts=opts, context_msg=context_msg):
                 api_tokens = api.list_user_tokens()
-        except exceptions.ApiException as exc:
+        except api_exceptions.ApiException as exc:
             # If we can't list tokens due to API error, fall back to creating a new one
             if opts.debug:
                 click.echo(f"Debug: Failed to list tokens with error: {exc}", err=True)
@@ -194,7 +195,7 @@ def refresh_existing_token_interactive(
             click.echo(f"New token value: {click.style(new_token.key, fg='magenta')}")
 
         return new_token
-    except exceptions.ApiException as exc:
+    except api_exceptions.ApiException as exc:
         # If refresh fails due to API error, offer to create a new token instead
         if opts.debug:
             click.echo(f"\nDebug: Refresh failed with error: {exc}", err=True)
@@ -222,7 +223,7 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
 
         return new_token
 
-    except exceptions.ApiException as exc:
+    except api_exceptions.ApiException as exc:
         if exc.status == 401:
             click.echo(f"{exc.detail}")
             return
@@ -233,3 +234,54 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
                 exc, ctx, opts, save_config=save_config, force=force, json=json
             )
             return new_token
+
+
+@tokens.command()
+@click.option(
+    "-o",
+    "--oidc-slug",
+    "oidc_slug",
+    default=None,
+    help="The service slug (organization) for OIDC token exchange.",
+)
+@decorators.common_cli_config_options
+@decorators.common_cli_output_options
+@decorators.common_api_auth_options
+@decorators.initialise_api
+@click.pass_context
+def get(ctx, opts, oidc_slug):
+    """Get the current authentication token for the active session.
+
+    This command uses the credential provider chain to intelligently detect
+    and return the appropriate authentication token:
+
+    1. Environment variable (CLOUDSMITH_API_KEY)
+    2. Config file (config.ini)
+    3. SAML keyring (from 'cloudsmith login --saml')
+    4. OIDC token exchange (GitHub Actions, GitLab CI, AWS, Azure, etc.)
+
+    This is useful for credential helpers, scripts, and other tools that need
+    to authenticate with Cloudsmith programmatically.
+    """
+    # Use credential provider chain
+    from ...core import credentials as creds_module
+    
+    credentials = creds_module.get_credentials(opts=opts, oidc_slug=oidc_slug)
+    
+    if credentials:
+        if opts.debug:
+            click.echo(f"Debug: Using credentials from {credentials.source}", err=True)
+        click.echo(credentials.api_key)
+        return
+
+    # No credentials found
+    click.secho(
+        "No authentication token found. Please authenticate using one of these methods:",
+        fg="red",
+        err=True,
+    )
+    click.echo("  1. Set CLOUDSMITH_API_KEY environment variable", err=True)
+    click.echo("  2. Run 'cloudsmith login' to get an API key", err=True)
+    click.echo("  3. Run 'cloudsmith login --saml -o <org>' for SAML authentication", err=True)
+    click.echo("  4. Ensure OIDC credentials are available (CI/CD environments)", err=True)
+    ctx.exit(1)
