@@ -15,11 +15,16 @@ class PageInfo:
 
     def __str__(self):
         """Get page information as text."""
-        data = self.as_dict()
-        data["valid"] = self.is_valid
         return (
             "Valid: %(valid)s, Count: %(count)s, Page: %(page)s, "
-            "Size: %(page_size)s, Total: %(results_total)s" % data
+            "Size: %(page_size)s, Total: %(page_total)s"
+            % {
+                "valid": self.is_valid,
+                "count": self.count,
+                "page": self.page,
+                "page_size": self.page_size,
+                "page_total": self.page_total,
+            }
         )
 
     def calculate_range(self, num_results):
