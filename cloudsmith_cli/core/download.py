@@ -317,7 +317,7 @@ def stream_download(  # noqa: C901
             # SSO Bearer tokens don't work with /basic/ endpoints - need API key
             if not quiet:
                 click.echo(
-                    "Warning: SSO authentication detected. Private repository downloads require an API key.",
+                    "Warning: SAML authentication detected. Private repository downloads require an API key.",
                     err=True,
                 )
                 click.echo("Options:", err=True)

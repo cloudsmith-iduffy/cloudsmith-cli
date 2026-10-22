@@ -77,7 +77,7 @@ def initialise_api(
                 keyring.update_refresh_attempted_at(config.host)
 
                 click.secho(
-                    "An error occurred when attempting to refresh your SSO access token. To refresh this session, run 'cloudsmith auth'",
+                    "An error occurred when attempting to refresh your SAML access token. To refresh this session, run 'cloudsmith auth'",
                     fg="yellow",
                 )
 
@@ -90,7 +90,7 @@ def initialise_api(
             )
 
             if config.debug:
-                click.echo("SSO access token config value set")
+                click.echo("SAML access token config value set")
     elif key:
         config.api_key["X-Api-Key"] = key
 

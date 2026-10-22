@@ -70,7 +70,7 @@ class AuthenticationWebServer(HTTPServer):
         if not self.api_opts:
             return
 
-        # Drop any stale SSO bearer token so the newly stored one is applied
+        # Drop any stale SAML bearer token so the newly stored one is applied
         headers = {
             k: v
             for k, v in (getattr(self.api_opts, "headers", None) or {}).items()

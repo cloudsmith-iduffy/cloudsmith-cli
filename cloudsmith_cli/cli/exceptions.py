@@ -137,7 +137,7 @@ def get_401_error_hint(ctx, opts, exc):
     api_host = api_config.host if api_config else opts.api_host
     access_token = get_access_token(api_host)
     if access_token:
-        return "Since you have an SSO access token set, this probably means that it has expired. Try getting a new token with 'cloudsmith auth', then try again."
+        return "Since you have a SAML access token set, this probably means that it has expired. Try getting a new token with 'cloudsmith auth', then try again."
 
     if ctx.info_name == "token":
         # This is already the token command

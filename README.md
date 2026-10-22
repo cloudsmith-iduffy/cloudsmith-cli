@@ -164,7 +164,7 @@ Both configuration files use the simple INI format, such as:
 api_key=1234567890abcdef1234567890abcdef
 ```
 
-Additionally, the CLI will store SSO access and refresh tokens in the system keyring
+Additionally, the CLI will store SAML access and refresh tokens in the system keyring
 using the [`keyring`](https://github.com/jaraco/keyring) library.
 
 

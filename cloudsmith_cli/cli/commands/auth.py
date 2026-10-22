@@ -93,7 +93,7 @@ def authenticate(ctx, opts, owner, token, force, save_config, json):
             f"Beginning authentication for the {click.style(owner, bold=True)} org ... "
         )
 
-    context_message = "Failed to authenticate via SSO!"
+    context_message = "Failed to authenticate via SAML!"
     with handle_api_exceptions(ctx, opts=opts, context_msg=context_message):
         _perform_saml_authentication(
             opts, owner, enable_token_creation=token, json=json
