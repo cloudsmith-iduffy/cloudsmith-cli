@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import re
 from typing import Dict, List, Optional, Tuple
 
 import click
@@ -385,8 +386,10 @@ def stream_download(  # noqa: C901
         click.secho(f"✓ Downloaded {_format_size(downloaded)} to {outfile}", fg="green")
 
     # Verify checksum if available in response headers
-    expected_checksum = response.headers.get("etag", "").strip('"')
-    if expected_checksum and not quiet:
+    # ETags are only usable as checksums when they are a plain MD5/SHA1 hex
+    # digest (e.g. not weak or multipart ETags).
+    expected_checksum = response.headers.get("etag", "").strip('"').lower()
+    if re.fullmatch(r"[0-9a-f]{32}|[0-9a-f]{40}", expected_checksum) and not quiet:
         if _verify_checksum(outfile, expected_checksum):
             click.secho("✓ Checksum verified", fg="green")
         else:

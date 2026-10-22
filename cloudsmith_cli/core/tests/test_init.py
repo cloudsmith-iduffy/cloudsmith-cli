@@ -134,7 +134,7 @@ class TestInitialiseApi:
 
         config = initialise_api(host="https://example.com")
 
-        assert config.headers == {"Authorization": "Bearer dummy_access_token"}
+        assert config.headers == {"Authorization": "Bearer new_access_token"}
         mocked_refresh_access_token.assert_called_once()
         mocked_store_sso_tokens.assert_called_once_with(
             "https://example.com", "new_access_token", "new_refresh_token"

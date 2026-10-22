@@ -1,6 +1,7 @@
 """Cloudsmith API - Initialisation."""
 
 import base64
+from types import SimpleNamespace
 from typing import Type, TypeVar
 
 import click
@@ -34,7 +35,7 @@ def initialise_api(
     config.host = host if host else config.host
     config.proxy = proxy if proxy else config.proxy
     config.user_agent = user_agent
-    config.headers = headers if headers else {}
+    config.headers = dict(headers) if headers else {}
     config.rate_limit = rate_limit
     config.rate_limit_callback = rate_limit_callback
     config.error_retry_max = error_retry_max
@@ -58,11 +59,20 @@ def initialise_api(
                         config.host,
                         access_token,
                         refresh_token,
-                        session=saml.create_configured_session(config),
+                        session=saml.create_configured_session(
+                            SimpleNamespace(
+                                api_ssl_verify=config.verify_ssl,
+                                api_proxy=config.proxy,
+                                api_user_agent=config.user_agent,
+                                api_headers=config.headers,
+                            )
+                        ),
                     )
                     keyring.store_sso_tokens(
                         config.host, new_access_token, new_refresh_token
                     )
+                    if new_access_token:
+                        access_token = new_access_token
             except ApiException:
                 keyring.update_refresh_attempted_at(config.host)
 
@@ -93,7 +103,7 @@ def initialise_api(
             if auth_type == "Basic":
                 decoded = base64.b64decode(encoded)
                 values = decoded.decode("utf-8")
-                config.username, config.password = values.split(":")
+                config.username, config.password = values.split(":", 1)
 
                 if config.debug:
                     click.echo("Username and password config values set")

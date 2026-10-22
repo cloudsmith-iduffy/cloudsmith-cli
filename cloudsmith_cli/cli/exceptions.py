@@ -101,7 +101,7 @@ def get_details(exc):
                 field_detail = v
 
             if isinstance(field_detail, (list, tuple)):
-                field_detail = " ".join(field_detail)
+                field_detail = " ".join(str(x) for x in field_detail)
 
             if k == "non_field_errors":
                 if detail:
@@ -133,7 +133,9 @@ def get_401_error_hint(ctx, opts, exc):
             "you don't have the permission to perform this action."
         )
 
-    access_token = get_access_token(opts.api_host)
+    api_config = getattr(opts, "api_config", None)
+    api_host = api_config.host if api_config else opts.api_host
+    access_token = get_access_token(api_host)
     if access_token:
         return "Since you have an SSO access token set, this probably means that it has expired. Try getting a new token with 'cloudsmith auth', then try again."
 

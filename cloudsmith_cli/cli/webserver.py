@@ -70,14 +70,26 @@ class AuthenticationWebServer(HTTPServer):
         if not self.api_opts:
             return
 
+        # Drop any stale SSO bearer token so the newly stored one is applied
+        headers = {
+            k: v
+            for k, v in (getattr(self.api_opts, "headers", None) or {}).items()
+            if not (k == "Authorization" and v.startswith("Bearer "))
+        }
+
         initialise_api(
             debug=self.api_opts.debug,
             host=self.api_opts.host,
             proxy=getattr(self.api_opts, "proxy", None),
-            ssl_verify=getattr(self.api_opts, "ssl_verify", True),
+            ssl_verify=getattr(self.api_opts, "verify_ssl", True),
             user_agent=getattr(self.api_opts, "user_agent", None),
-            headers=getattr(self.api_opts, "headers", None),
+            headers=headers,
             rate_limit=getattr(self.api_opts, "rate_limit", True),
+            rate_limit_callback=getattr(self.api_opts, "rate_limit_callback", None),
+            error_retry_max=getattr(self.api_opts, "error_retry_max", None),
+            error_retry_backoff=getattr(self.api_opts, "error_retry_backoff", None),
+            error_retry_codes=getattr(self.api_opts, "error_retry_codes", None),
+            error_retry_cb=getattr(self.api_opts, "error_retry_cb", None),
         )
 
     def finish_request(self, request, client_address):
