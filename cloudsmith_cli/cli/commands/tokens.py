@@ -86,7 +86,7 @@ def create(ctx, opts, save_config, force=False, json=False):
     """Create a new API token."""
     new_token = _create(ctx, opts, save_config, force, json)
 
-    if save_config:
+    if save_config and new_token:
         create, has_errors = create_config_files(
             ctx, opts, api_key=new_token.key, force=force
         )
@@ -119,7 +119,7 @@ def create(ctx, opts, save_config, force=False, json=False):
 def refresh(ctx, opts, token_slug, force, save_config):
     """Refresh a specific API token by its slug."""
     new_token = refresh_existing_token_interactive(
-        ctx, opts, token_slug, save_config, force
+        ctx, opts, token_slug, save_config, force, json=opts.output != "pretty"
     )
 
     if new_token:
@@ -208,12 +208,10 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
         new_token = api.create_user_token_saml()
 
         if new_token:
-            if json:
+            if json and opts.output == "pretty":
                 opts.output = "json"
-                if maybe_print_as_json(opts, new_token):
-                    return
             if maybe_print_as_json(opts, new_token):
-                return
+                return new_token
             if not json:
                 click.echo(
                     f"New token value: {click.style(new_token.key, fg='magenta')}"
@@ -226,10 +224,14 @@ def _create(ctx, opts, save_config=False, force=False, json=False):
         if exc.status == 401:
             click.echo(f"{exc.detail}")
             return
-        if json:
+        if json and opts.output == "pretty":
             opts.output = "json"
         if exc.status == 400:
             new_token = handle_duplicate_token_error(
                 exc, ctx, opts, save_config=save_config, force=force, json=json
             )
             return new_token
+        with handle_api_exceptions(
+            ctx, opts=opts, context_msg="Failed to create API token!"
+        ):
+            raise

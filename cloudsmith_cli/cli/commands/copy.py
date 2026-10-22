@@ -2,6 +2,7 @@
 
 import click
 
+from ...core.api.exceptions import ApiException
 from ...core.api.packages import copy_package
 from .. import decorators, validators
 from ..exceptions import handle_api_exceptions
@@ -66,27 +67,31 @@ def copy(
         nl=False,
     )
 
-    context_msg = "Failed to copy package!"
-    with handle_api_exceptions(
-        ctx, opts=opts, context_msg=context_msg, reraise_on_error=skip_errors
-    ):
-        with maybe_spinner(opts):
-            _, new_slug = copy_package(
-                owner=owner, repo=source, identifier=slug, destination=destination
-            )
+    try:
+        context_msg = "Failed to copy package!"
+        with handle_api_exceptions(
+            ctx, opts=opts, context_msg=context_msg, reraise_on_error=skip_errors
+        ):
+            with maybe_spinner(opts):
+                _, new_slug = copy_package(
+                    owner=owner, repo=source, identifier=slug, destination=destination
+                )
 
-    click.secho("OK", fg="green")
+        click.secho("OK", fg="green")
 
-    if no_wait_for_sync:
-        return
+        if no_wait_for_sync:
+            return
 
-    wait_for_package_sync(
-        ctx=ctx,
-        opts=opts,
-        owner=owner,
-        repo=destination,
-        slug=new_slug,
-        wait_interval=wait_interval,
-        skip_errors=skip_errors,
-        attempts=sync_attempts,
-    )
+        wait_for_package_sync(
+            ctx=ctx,
+            opts=opts,
+            owner=owner,
+            repo=destination,
+            slug=new_slug,
+            wait_interval=wait_interval,
+            skip_errors=skip_errors,
+            attempts=sync_attempts,
+        )
+    except ApiException:
+        # Only raised when --skip-errors is set; the error is already shown.
+        click.secho("Skipping error and moving on.", fg="yellow")

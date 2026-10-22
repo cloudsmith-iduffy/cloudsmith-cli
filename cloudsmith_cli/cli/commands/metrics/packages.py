@@ -53,7 +53,7 @@ def _print_metrics_table(opts, data):
             cols.append(click.style(value, fg="green"))
         rows.append(cols)
 
-    utils.pretty_print_table(headers=headers, rows=rows, title="Entitlement Metrics")
+    utils.pretty_print_table(headers=headers, rows=rows, title="Package Metrics")
 
     click.echo()
 

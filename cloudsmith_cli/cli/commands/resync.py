@@ -2,6 +2,7 @@
 
 import click
 
+from ...core.api.exceptions import ApiException
 from ...core.api.packages import resync_package as api_resync_package
 from .. import decorators, validators
 from ..exceptions import handle_api_exceptions
@@ -48,23 +49,32 @@ def resync(
     """
     owner, source, slug = owner_repo_package
 
-    resync_package(
-        ctx=ctx, opts=opts, owner=owner, repo=source, slug=slug, skip_errors=skip_errors
-    )
+    try:
+        resync_package(
+            ctx=ctx,
+            opts=opts,
+            owner=owner,
+            repo=source,
+            slug=slug,
+            skip_errors=skip_errors,
+        )
 
-    if no_wait_for_sync:
-        return
+        if no_wait_for_sync:
+            return
 
-    wait_for_package_sync(
-        ctx=ctx,
-        opts=opts,
-        owner=owner,
-        repo=source,
-        slug=slug,
-        wait_interval=wait_interval,
-        skip_errors=skip_errors,
-        attempts=sync_attempts,
-    )
+        wait_for_package_sync(
+            ctx=ctx,
+            opts=opts,
+            owner=owner,
+            repo=source,
+            slug=slug,
+            wait_interval=wait_interval,
+            skip_errors=skip_errors,
+            attempts=sync_attempts,
+        )
+    except ApiException:
+        # Only raised when --skip-errors is set; the error is already shown.
+        click.secho("Skipping error and moving on.", fg="yellow")
 
 
 def resync_package(ctx, opts, owner, repo, slug, skip_errors):

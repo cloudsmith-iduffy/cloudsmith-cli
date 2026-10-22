@@ -188,14 +188,6 @@ def download(  # noqa: C901
             pkg_version = package_detail.get("version", "unknown")
             output_dir = os.path.abspath(f"{pkg_name}-{pkg_version}")
 
-        # Create directory if it doesn't exist
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        elif not os.path.isdir(output_dir):
-            raise click.ClickException(
-                f"Output path '{output_dir}' exists but is not a directory."
-            )
-
         if dry_run:
             click.echo()
             click.echo("Dry run - would download:")
@@ -211,6 +203,14 @@ def download(  # noqa: C901
                     f"{_format_file_size(file_info.get('size', 0))}"
                 )
             return
+
+        # Create directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        elif not os.path.isdir(output_dir):
+            raise click.ClickException(
+                f"Output path '{output_dir}' exists but is not a directory."
+            )
 
         # Download all files
         click.echo(f"\nDownloading {len(files_to_download)} files to: {output_dir}")
@@ -271,7 +271,10 @@ def download(  # noqa: C901
         return
 
     # Single file download (original behavior)
-    download_url = get_download_url(package)
+    try:
+        download_url = get_download_url(package)
+    except click.ClickException:
+        download_url = None
 
     if not download_url:
         # Try getting detailed package info

@@ -564,7 +564,7 @@ def refresh(ctx, opts, owner_repo_identifier, show_tokens, yes):
 @click.argument(
     "owner_repo", metavar="OWNER/REPO", callback=validators.validate_owner_repo
 )
-@click.argument("source", metavar="SOURCE", default=str)
+@click.argument("source", metavar="SOURCE")
 @click.option(
     "-y",
     "--yes",
@@ -655,7 +655,7 @@ def sync(ctx, opts, owner_repo, show_tokens, source, yes):
     "--refresh-token",
     type=str,
     required=False,
-    help="The unit of bandwidth used to calculate the restrictions applied to the entitlement token (e.g. "
+    help="The period after which the restriction counters for the entitlement token are reset (e.g. "
     "Never reset, Daily, Weekly, Fortnightly, Monthly, Bi-Monthly, Quarterly, Every 6 months, Annual).",
     callback=validators.validate_scheduled_reset_period,
 )

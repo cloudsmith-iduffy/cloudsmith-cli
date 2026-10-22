@@ -286,10 +286,14 @@ class TestDownloadCommand(unittest.TestCase):
             download, ["--config-file", "/dev/null", "testorg/testrepo", "test-package"]
         )
 
-        # Should fail because we're raising an exception
-        self.assertEqual(result.exit_code, 1)
-        # But verify the right calls were still attempted
-        self.assertTrue(mock_get_url.called)
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(mock_get_url.call_count, 2)
+        mock_get_detail.assert_called_once_with(
+            owner="testorg", repo="testrepo", identifier="test-slug"
+        )
+        self.assertEqual(
+            mock_stream.call_args[1]["url"], "https://example.com/test.deb"
+        )
 
     def test_download_invalid_repo_format(self):
         """Test error handling for invalid repository format."""

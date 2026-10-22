@@ -95,10 +95,14 @@ def list_tags(ctx, opts, owner_repo_package):
     """
     owner, repo, package = owner_repo_package
 
+    # Use stderr for messages if the output is something else (e.g.  # JSON)
+    use_stderr = opts.output != "pretty"
+
     click.echo(
         "Listing tags for the '%(package)s' package ... "
         % {"package": click.style(package, bold=True)},
         nl=False,
+        err=use_stderr,
     )
 
     context_msg = "Failed to list tags for the package!"
@@ -108,7 +112,7 @@ def list_tags(ctx, opts, owner_repo_package):
                 owner=owner, repo=repo, identifier=package
             )
 
-    click.secho("OK", fg="green")
+    click.secho("OK", fg="green", err=use_stderr)
 
     _print_tags(opts, package_tags, package_tags_immutable)
 
@@ -156,6 +160,9 @@ def add_tags(ctx, opts, owner_repo_package, tags, immutable):
       $ cloudsmith tags add your-org/awesome-repo/better-pkg foo,bar
     """
     owner, repo, package = owner_repo_package
+
+    # Use stderr for messages if the output is something else (e.g.  # JSON)
+    use_stderr = opts.output != "pretty"
     tags = _parse_tags(tags)
 
     click.echo(
@@ -166,6 +173,7 @@ def add_tags(ctx, opts, owner_repo_package, tags, immutable):
             "s": "s" if len(tags) != 1 else "",
         },
         nl=False,
+        err=use_stderr,
     )
 
     context_msg = "Failed to add tags to package!"
@@ -178,7 +186,7 @@ def add_tags(ctx, opts, owner_repo_package, tags, immutable):
                 data={"action": "add", "tags": tags, "is_immutable": immutable},
             )
 
-    click.secho("OK", fg="green")
+    click.secho("OK", fg="green", err=use_stderr)
 
     _print_tags(opts, package_tags, package_tags_immutable)
 
@@ -212,10 +220,14 @@ def clear_tags(ctx, opts, owner_repo_package):
     """
     owner, repo, package = owner_repo_package
 
+    # Use stderr for messages if the output is something else (e.g.  # JSON)
+    use_stderr = opts.output != "pretty"
+
     click.echo(
         "Clearing tags on the '%(package)s' package ... "
         % {"package": click.style(package, bold=True)},
         nl=False,
+        err=use_stderr,
     )
 
     context_msg = "Failed to clear tags on package!"
@@ -225,7 +237,7 @@ def clear_tags(ctx, opts, owner_repo_package):
                 owner=owner, repo=repo, identifier=package, data={"action": "clear"}
             )
 
-    click.secho("OK", fg="green")
+    click.secho("OK", fg="green", err=use_stderr)
 
     _print_tags(opts, package_tags, package_tags_immutable)
 
@@ -263,6 +275,9 @@ def remove_tags(ctx, opts, owner_repo_package, tags):
       $ cloudsmith tags remove your-org/awesome-repo/better-pkg foo,bar
     """
     owner, repo, package = owner_repo_package
+
+    # Use stderr for messages if the output is something else (e.g.  # JSON)
+    use_stderr = opts.output != "pretty"
     tags = _parse_tags(tags)
 
     click.echo(
@@ -273,6 +288,7 @@ def remove_tags(ctx, opts, owner_repo_package, tags):
             "s": "s" if len(tags) != 1 else "",
         },
         nl=False,
+        err=use_stderr,
     )
 
     context_msg = "Failed to remove tags from package!"
@@ -285,7 +301,7 @@ def remove_tags(ctx, opts, owner_repo_package, tags):
                 data={"action": "remove", "tags": tags},
             )
 
-    click.secho("OK", fg="green")
+    click.secho("OK", fg="green", err=use_stderr)
 
     _print_tags(opts, package_tags, package_tags_immutable)
 
@@ -333,6 +349,9 @@ def replace_tags(ctx, opts, owner_repo_package, tags, immutable):
       $ cloudsmith tags replace your-org/awesome-repo/better-pkg foo,bar
     """
     owner, repo, package = owner_repo_package
+
+    # Use stderr for messages if the output is something else (e.g.  # JSON)
+    use_stderr = opts.output != "pretty"
     tags = _parse_tags(tags)
 
     click.echo(
@@ -343,6 +362,7 @@ def replace_tags(ctx, opts, owner_repo_package, tags, immutable):
             "s": "s" if len(tags) != 1 else "",
         },
         nl=False,
+        err=use_stderr,
     )
 
     context_msg = "Failed to replace tags on package!"
@@ -355,6 +375,6 @@ def replace_tags(ctx, opts, owner_repo_package, tags, immutable):
                 data={"action": "replace", "tags": tags, "is_immutable": immutable},
             )
 
-    click.secho("OK", fg="green")
+    click.secho("OK", fg="green", err=use_stderr)
 
     _print_tags(opts, package_tags, package_tags_immutable)

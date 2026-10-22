@@ -158,7 +158,7 @@ def create(ctx, opts, owner, policy_config_file):
           "spdx_identifiers" : ["your_licenses"],
           "package_query_string" : "format:python AND downloads:>50",
           "allow_unknown_licenses": false,
-          "quarantine_on_violation": true
+          "on_violation_quarantine": true
         }
 
     Full CLI example:
@@ -239,7 +239,7 @@ def update(ctx, opts, owner, identifier, policy_config_file):
           "spdx_identifiers" : ["your_licenses"],
           "package_query_string" : "format:python AND downloads:>50",
           "allow_unknown_licenses": false,
-          "quarantine_on_violation": true
+          "on_violation_quarantine": true
         }
 
     Full CLI example:

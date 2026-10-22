@@ -60,7 +60,7 @@ def upload_file(ctx, opts, owner, repo, filepath, skip_errors, md5_checksum):
     basename = os.path.basename(filename)
 
     filesize = utils.get_file_size(filepath=filename)
-    projected_chunks = math.floor(filesize / CHUNK_SIZE) + 1
+    projected_chunks = max(1, math.ceil(filesize / CHUNK_SIZE))
     is_multi_part_upload = projected_chunks > 1
 
     click.echo(
@@ -97,8 +97,13 @@ def upload_file(ctx, opts, owner, repo, filepath, skip_errors, md5_checksum):
                 empty_char=click.style("-", fg="red"),
             ) as pb:
 
+                last_bytes_read = 0
+
                 def progress_callback(monitor):
-                    pb.update(monitor.bytes_read)
+                    # bytes_read is cumulative, whereas update() takes a delta
+                    nonlocal last_bytes_read
+                    pb.update(monitor.bytes_read - last_bytes_read)
+                    last_bytes_read = monitor.bytes_read
 
                 api_upload_file(
                     upload_url=upload_url,
@@ -278,7 +283,7 @@ def wait_for_package_sync(
 
         # pylint: disable=fixme
         # FIXME: The API should communicate "no retry" fails
-        if "package should be deleted" in reason and attempts > 1:
+        if "package should be deleted" in reason and attempts > 0:
             click.secho(
                 "This is not recoverable, so stopping further attempts!", fg="red"
             )
