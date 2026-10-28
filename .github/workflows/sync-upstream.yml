@@ -1,0 +1,38 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror master and tags from upstream
+        env:
+          SYNC_DEPLOY_KEY: ${{ secrets.SYNC_DEPLOY_KEY }}
+        run: |
+          install -m 600 /dev/null ~/deploy_key
+          printf '%s\n' "$SYNC_DEPLOY_KEY" > ~/deploy_key
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$HOME/known_hosts"
+          git init -q --bare mirror
+          git -C mirror fetch -q --no-tags https://github.com/cloudsmith-io/cloudsmith-cli.git \
+            '+refs/heads/master:refs/heads/master' '+refs/tags/*:refs/tags/*'
+          git -C mirror push --force "git@github.com:${GITHUB_REPOSITORY}.git" \
+            refs/heads/master:refs/heads/master 'refs/tags/*:refs/tags/*'
+
+      # Upstream workflows start on each sync push, and the fork has none of their secrets.
+      - name: Disable upstream workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows" \
+            --jq '.workflows[] | select(.state == "active" and (.path | startswith(".github/workflows/")) and .path != ".github/workflows/sync-upstream.yml") | .id' |
+          while read -r workflow_id; do
+            gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/disable"
+          done
