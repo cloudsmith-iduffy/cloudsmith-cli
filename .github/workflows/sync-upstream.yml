@@ -27,12 +27,19 @@ jobs:
             refs/heads/master:refs/heads/master 'refs/tags/*:refs/tags/*'
 
       # Upstream workflows start on each sync push, and the fork has none of their secrets.
-      - name: Disable upstream workflows
+      # GitHub can disable a workflow only after a push makes it active again.
+      - name: Disable upstream workflows and cancel their runs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          sleep 30
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows" \
             --jq '.workflows[] | select(.state == "active" and (.path | startswith(".github/workflows/")) and .path != ".github/workflows/sync-upstream.yml") | .id' |
           while read -r workflow_id; do
             gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/disable"
+          done
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs?event=push&per_page=100" \
+            --jq '.workflow_runs[] | select(.status != "completed") | .id' |
+          while read -r run_id; do
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel"
           done
